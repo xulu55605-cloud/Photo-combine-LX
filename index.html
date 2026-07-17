@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>照片拼接工具 🌸</title>
+  <!-- PWA Support -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#ff8fa3">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      /* 马卡龙粉嫩色系 */
+      --bg: #fff5f6;                /* 极淡粉底色 */
+      --surface: #ffffff;           /* 纯白卡片 */
+      --surface-2: #fff0f2;         /* 浅蜜桃粉 */
+      --border: rgba(255, 182, 193, 0.4);       /* 柔和粉樱边框 */
+      --border-strong: rgba(255, 105, 180, 0.3);/* 深粉色边框 */
+      --text: #5c4245;              /* 柔和深可可褐 */
+      --text-sub: #8c6a6e;          /* 灰粉褐 */
+      --text-muted: #bfa3a6;        /* 淡灰粉 */
+      --accent: #ff8fa3;            /* 樱花粉 */
+      --accent-hover: #ff758f;      /* 蜜桃深粉 */
+      --accent-on: #ffffff;
+      --radius: 12px;
+      --shadow-sm: 0 4px 12px rgba(255, 182, 193, 0.15);
+      --shadow-md: 0 8px 24px rgba(255, 182, 193, 0.25);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #2d1b1e;
+        --surface: #3d2529;
+        --surface-2: #4a2e33;
+        --border: rgba(255, 143, 163, 0.2);
+        --border-strong: rgba(255, 143, 163, 0.35);
+        --text: #ffe0e3;
+        --text-sub: #f0b4bc;
+        --text-muted: #bc8f95;
+        --accent: #ff758f;
+        --accent-hover: #ff8fa3;
+        --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+                   'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 30px 16px 48px;
+      transition: background-color 0.3s;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; }
+
+    h1 { 
+      font-size: 26px; 
+      font-weight: 600; 
+      margin-bottom: 6px; 
+      color: var(--accent-hover);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .subtitle { font-size: 14px; color: var(--text-sub); margin-bottom: 24px; }
+
+    /* ── Template switcher ── */
+    .tpl-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 18px;
+      align-items: center;
+      flex-wrap: wrap;
+      box-shadow: var(--shadow-sm);
+    }
+    .tpl-label { font-size: 13px; color: var(--text-sub); font-weight: 600; margin-right: 4px; white-space: nowrap; }
+    .tpl-btn {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 16px;
+      height: 38px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sub);
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 500;
+    }
+    .tpl-btn:hover { 
+      background: var(--surface-2); 
+      color: var(--accent-hover); 
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+    .tpl-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 10px rgba(255, 117, 143, 0.4);
+    }
+    .tpl-btn svg { flex-shrink: 0; }
+    .tpl-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    /* ── Panels ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 22px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .panel:hover {
+      box-shadow: var(--shadow-md);
+    }
+    .panel-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-hover);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .panel-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 12px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+    .field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-sub); }
+    .field label { white-space: nowrap; font-weight: 500; }
+
+    select, input[type="text"], input[type="number"] {
+      height: 34px; font-size: 13px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+      color: var(--text); padding: 0 12px; outline: none;
+      transition: all 0.2s;
+    }
+    select:focus, input[type="text"]:focus, input[type="number"]:focus {
+      border-color: var(--accent-hover);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(255, 143, 163, 0.25);
+    }
+    select {
+      cursor: pointer;
+      padding-right: 20px;
+    }
+    input[type="color"] {
+      width: 40px; height: 34px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+      padding: 3px; cursor: pointer; outline: none;
+      transition: transform 0.1s;
+    }
+    input[type="color"]:hover {
+      transform: scale(1.05);
+    }
+    input[type="number"] { width: 72px; }
+    input[type="text"]   { width: 200px; }
+
+    /* ── Upload ── */
+    .upload-zone {
+      border: 2px dashed var(--accent);
+      background: rgba(255, 240, 242, 0.5);
+      border-radius: 16px; padding: 32px 20px;
+      text-align: center; cursor: pointer;
+      color: var(--text-sub); font-size: 14px;
+      transition: all 0.2s ease;
+      margin-bottom: 16px;
+      box-shadow: inset 0 2px 8px rgba(255, 182, 193, 0.1);
+    }
+    .upload-zone:hover, .upload-zone.over {
+      background: var(--surface-2); 
+      border-color: var(--accent-hover); 
+      color: var(--accent-hover);
+      transform: scale(1.01);
+    }
+    .upload-zone svg { display: block; margin: 0 auto 10px; color: var(--accent); transition: transform 0.2s; }
+    .upload-zone:hover svg { transform: translateY(-3px); }
+    .badge {
+      display: inline-flex; align-items: center;
+      background: var(--accent); color: #fff;
+      border-radius: 20px; padding: 3px 12px;
+      font-size: 11px; font-weight: 600; margin-left: 8px;
+      box-shadow: 0 2px 6px rgba(255, 117, 143, 0.3);
+    }
+
+    /* ── Preview area ── */
+    .preview-area {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    /* Phone mockup shell */
+    .phone-shell {
+      flex-shrink: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+    }
+    .phone-shell.visible { display: flex; }
+    .phone-frame {
+      border: 6px solid var(--text-sub);
+      border-radius: 36px;
+      background: #fff;
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      box-shadow: var(--shadow-md);
+    }
+    .phone-notch {
+      width: 70px; height: 12px;
+      background: var(--text-sub);
+      border-radius: 0 0 12px 12px;
+      margin-bottom: 8px;
+    }
+    .phone-screen {
+      width: 150px;
+      overflow: hidden;
+      border-radius: 6px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+    .phone-screen canvas { width: 100% !important; height: auto !important; display: block; }
+    .phone-home {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 3px solid var(--text-sub);
+      margin-top: 8px;
+    }
+    .phone-label { font-size: 11px; color: var(--text-sub); margin-top: 8px; font-weight: 600; }
+
+    /* Landscape mockup */
+    .landscape-shell {
+      flex-shrink: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+    }
+    .landscape-shell.visible { display: flex; }
+    .landscape-frame {
+      border: 6px solid var(--text-sub);
+      border-radius: 20px;
+      background: #fff;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow-md);
+    }
+    .landscape-notch {
+      width: 12px; height: 60px;
+      background: var(--text-sub);
+      border-radius: 0 12px 12px 0;
+    }
+    .landscape-screen {
+      height: 150px;
+      overflow: hidden;
+      border-radius: 6px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+    .landscape-screen canvas { height: 100% !important; width: auto !important; display: block; }
+    .landscape-label { font-size: 11px; color: var(--text-sub); margin-top: 8px; font-weight: 600; }
+
+    .canvas-wrap {
+      flex: 1;
+      background: var(--surface-2);
+      border-radius: 16px;
+      border: 2px dashed var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 250px;
+      overflow: hidden;
+      box-shadow: inset 0 2px 10px rgba(255, 182, 193, 0.05);
+    }
+    #mainCanvas { display: none; max-width: 100%; max-height: 65vh; border-radius: 8px; box-shadow: var(--shadow-sm); }
+    .empty-hint {
+      text-align: center; color: var(--text-muted); font-size: 14px; padding: 4rem 2rem;
+    }
+    .empty-hint svg { display: block; margin: 0 auto 12px; color: var(--accent); opacity: .6; }
+
+    /* ── Thumbs ── */
+    .thumb-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    .thumb {
+      position: relative; width: 72px; height: 72px;
+      border-radius: 10px; overflow: hidden;
+      border: 2px solid var(--border); flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.15s;
+    }
+    .thumb:hover {
+      transform: scale(1.05);
+      border-color: var(--accent);
+    }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .thumb .del {
+      position: absolute; top: 3px; right: 3px;
+      width: 20px; height: 20px;
+      background: rgba(255, 117, 143, 0.9); color: #fff;
+      border: none; border-radius: 50%; font-size: 12px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      padding: 0; line-height: 1;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+      transition: background 0.1s;
+    }
+    .thumb .del:hover { background: #ff4d6d; }
+    .thumb-num {
+      position: absolute; bottom: 3px; left: 4px;
+      font-size: 10px; color: #fff; font-weight: bold;
+      background: rgba(92, 66, 69, 0.75); border-radius: 4px; padding: 1px 5px;
+    }
+
+    /* ── Buttons ── */
+    .actions { display: flex; gap: 12px; justify-content: flex-end; }
+    button {
+      height: 40px; padding: 0 20px; border-radius: var(--radius);
+      font-size: 13px; font-family: inherit; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: all 0.2s ease;
+      border: 1px solid var(--border-strong);
+      background: var(--surface); color: var(--text-sub);
+      font-weight: 600;
+    }
+    button:hover { 
+      background: var(--surface-2); 
+      border-color: var(--accent);
+      color: var(--accent-hover);
+    }
+    button:active { transform: scale(0.96); }
+    button.primary { 
+      background: linear-gradient(135deg, var(--accent), var(--accent-hover)); 
+      color: #fff; 
+      border-color: transparent;
+      box-shadow: 0 4px 12px rgba(255, 117, 143, 0.35);
+    }
+    button.primary:hover { 
+      background: linear-gradient(135deg, var(--accent-hover), #ff4d6d); 
+      box-shadow: 0 6px 16px rgba(255, 117, 143, 0.45);
+    }
+
+    @media (max-width: 600px) {
+      .row { gap: 10px; }
+      input[type="text"] { width: 150px; }
+      .tpl-hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <h1>📷 照片拼接工具 🌸</h1>
+  <p class="subtitle">导入多张照片，拼合为大图，支持竖屏 / 横屏 / 方形三种模板，叠加文字后下载</p>
+
+  <!-- ── 模板切换 ── -->
+  <div class="tpl-bar">
+    <span class="tpl-label">输出模板：</span>
+
+    <button class="tpl-btn active" id="tplPortrait">
+      <!-- 竖屏手机 icon -->
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="2" width="14" height="20" rx="3"/>
+        <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/>
+      </svg>
+      竖屏 9:16
+    </button>
+
+    <button class="tpl-btn" id="tplLandscape">
+      <!-- 横屏 icon -->
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="5" width="20" height="14" rx="3"/>
+        <circle cx="18" cy="12" r="1" fill="currentColor" stroke="none"/>
+      </svg>
+      横屏 16:9
+    </button>
+
+    <button class="tpl-btn" id="tplSquare">
+      <!-- 方形 icon -->
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="3"/>
+      </svg>
+      方形 1:1
+    </button>
+
+    <span class="tpl-hint">切换模板会自动调整画布比例与网格布局</span>
+  </div>
+
+  <!-- ── 拼接设置 ── -->
+  <div class="panel">
+    <div class="panel-title">拼接设置</div>
+    <div class="row">
+      <div class="field">
+        <label for="colCount">照片数量</label>
+        <select id="colCount">
+          <option value="2">2 张</option>
+          <option value="3">3 张</option>
+          <option value="4" selected>4 张</option>
+          <option value="5">5 张</option>
+          <option value="6">6 张</option>
+          <option value="7">7 张</option>
+          <option value="8">8 张</option>
+          <option value="9">9 张</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="layoutMode">网格布局</label>
+        <select id="layoutMode">
+          <option value="auto">自动</option>
+          <option value="grid">均匀网格</option>
+          <option value="row">横排一行</option>
+          <option value="col">竖排一列</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="gapSize">间距</label>
+        <select id="gapSize">
+          <option value="0">无</option>
+          <option value="4" selected>小</option>
+          <option value="10">中</option>
+          <option value="20">大</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="bgColor">背景色</label>
+        <input type="color" id="bgColor" value="#ffffff">
+      </div>
+      <div class="field">
+        <label for="fitMode">填充方式</label>
+        <select id="fitMode">
+          <option value="cover">裁剪填充</option>
+          <option value="contain">完整显示</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 标签文字 ── -->
+  <div class="panel">
+    <div class="panel-title">标签文字（可选）</div>
+    <div class="row">
+      <div class="field">
+        <label for="labelText">文字内容</label>
+        <input type="text" id="labelText" placeholder="输入标签文字…">
+      </div>
+      <div class="field">
+        <label for="fontSize">字号</label>
+        <input type="number" id="fontSize" value="36" min="12" max="200">
+      </div>
+      <div class="field">
+        <label for="fontColor">字色</label>
+        <input type="color" id="fontColor" value="#ffffff">
+      </div>
+      <div class="field">
+        <label for="fontFamily">字体</label>
+        <select id="fontFamily">
+          <option value="sans-serif">无衬线</option>
+          <option value="serif">衬线</option>
+          <option value="monospace">等宽</option>
+          <option value="cursive">手写</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fontWeight">粗细</label>
+        <select id="fontWeight">
+          <option value="400">常规</option>
+          <option value="700">加粗</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field">
+        <label for="labelPos">位置</label>
+        <select id="labelPos">
+          <option value="top">顶部</option>
+          <option value="center">居中</option>
+          <option value="bottom">底部</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="labelBg">底色</label>
+        <input type="color" id="labelBg" value="#000000">
+      </div>
+      <div class="field">
+        <label for="labelBgOpacity">底色透明度</label>
+        <input type="number" id="labelBgOpacity" value="0" min="0" max="100">
+        <span style="font-size:13px;color:var(--text-muted)">%</span>
+      </div>
+      <div class="field">
+        <label for="shadowToggle">文字阴影</label>
+        <select id="shadowToggle">
+          <option value="0">关闭</option>
+          <option value="1">开启</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 水印 ── -->
+  <div class="panel">
+    <div class="panel-title">角落水印（可选）</div>
+    <div class="row">
+      <div class="field">
+        <label for="wmEnable">开启水印</label>
+        <select id="wmEnable">
+          <option value="0">关闭</option>
+          <option value="1">开启</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="wmText">水印内容</label>
+        <input type="text" id="wmText" placeholder="© 你的名字 / 品牌…" style="width:200px">
+      </div>
+      <div class="field">
+        <label for="wmPos">位置</label>
+        <select id="wmPos">
+          <option value="br">右下角</option>
+          <option value="bl">左下角</option>
+          <option value="tr">右上角</option>
+          <option value="tl">左上角</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="wmFontSize">字号</label>
+        <input type="number" id="wmFontSize" value="28" min="10" max="120">
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field">
+        <label for="wmColor">字色</label>
+        <input type="color" id="wmColor" value="#ffffff">
+      </div>
+      <div class="field">
+        <label for="wmOpacity">字色透明度</label>
+        <input type="number" id="wmOpacity" value="70" min="5" max="100">
+        <span style="font-size:13px;color:var(--text-muted)">%</span>
+      </div>
+      <div class="field">
+        <label for="wmBg">底色</label>
+        <input type="color" id="wmBg" value="#000000">
+      </div>
+      <div class="field">
+        <label for="wmBgOpacity">底色透明度</label>
+        <input type="number" id="wmBgOpacity" value="0" min="0" max="100">
+        <span style="font-size:13px;color:var(--text-muted)">%</span>
+      </div>
+      <div class="field">
+        <label for="wmShadow">文字阴影</label>
+        <select id="wmShadow">
+          <option value="1">开启</option>
+          <option value="0">关闭</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Upload ── -->
+  <div class="upload-zone" id="dropzone">
+    <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+    </svg>
+    点击或拖拽照片到此处上传
+    <span class="badge" id="countBadge">已选 0 / 4</span>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:5px">支持 JPG、PNG、WEBP 等格式</div>
+    <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+  </div>
+
+  <!-- ── Thumbs ── -->
+  <div class="thumb-strip" id="thumbStrip"></div>
+
+  <!-- ── Preview ── -->
+  <div class="preview-area">
+
+    <!-- 竖屏手机预览 -->
+    <div class="phone-shell visible" id="phoneShell">
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen" id="phoneScreen">
+          <canvas id="phoneCanvas"></canvas>
+        </div>
+        <div class="phone-home"></div>
+      </div>
+      <div class="phone-label">手机竖屏预览</div>
+    </div>
+
+    <!-- 横屏预览 -->
+    <div class="landscape-shell" id="landscapeShell">
+      <div class="landscape-frame">
+        <div class="landscape-notch"></div>
+        <div class="landscape-screen" id="landscapeScreen">
+          <canvas id="landscapeCanvas"></canvas>
+        </div>
+      </div>
+      <div class="landscape-label">手机横屏预览</div>
+    </div>
+
+    <!-- 主画布 -->
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="empty-hint" id="emptyHint">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        上传照片后在此预览拼接效果
+      </div>
+      <canvas id="mainCanvas"></canvas>
+    </div>
+
+  </div>
+
+  <!-- ── Actions ── -->
+  <div class="actions">
+    <button id="clearBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+      </svg>
+      清空照片
+    </button>
+    <button class="primary" id="downloadBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      下载拼图 PNG
+    </button>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker registered!', reg))
+      .catch(err => console.error('Service Worker registration failed', err));
+  });
+}
+
+(function () {
+  'use strict';
+
+  /* ── state ── */
+  const state = {
+    images: [],
+    needed: 4,
+    template: 'portrait'   // 'portrait' | 'landscape' | 'square'
+  };
+
+  /* canvas dimensions per template */
+  const TEMPLATES = {
+    portrait:  { w: 1080, h: 1920, label: '竖屏 9:16' },
+    landscape: { w: 1920, h: 1080, label: '横屏 16:9' },
+    square:    { w: 1080, h: 1080, label: '方形 1:1'  }
+  };
+
+  /* ── refs ── */
+  const $ = id => document.getElementById(id);
+  const colCount       = $('colCount');
+  const layoutMode     = $('layoutMode');
+  const gapSize        = $('gapSize');
+  const bgColor        = $('bgColor');
+  const fitMode        = $('fitMode');
+  const labelText      = $('labelText');
+  const fontSize       = $('fontSize');
+  const fontColor      = $('fontColor');
+  const fontFamily     = $('fontFamily');
+  const fontWeight     = $('fontWeight');
+  const labelPos       = $('labelPos');
+  const labelBg        = $('labelBg');
+  const labelBgOpacity = $('labelBgOpacity');
+  const shadowToggle   = $('shadowToggle');
+  const fileInput      = $('fileInput');
+  const dropzone       = $('dropzone');
+  const mainCanvas     = $('mainCanvas');
+  const ctx            = mainCanvas.getContext('2d');
+  const phoneCanvas    = $('phoneCanvas');
+  const pctx           = phoneCanvas.getContext('2d');
+  const lsCanvas       = $('landscapeCanvas');
+  const lctx           = lsCanvas.getContext('2d');
+  const emptyHint      = $('emptyHint');
+  const countBadge     = $('countBadge');
+  const thumbStrip     = $('thumbStrip');
+  const phoneShell     = $('phoneShell');
+  const landscapeShell = $('landscapeShell');
+
+  /* ── helpers ── */
+  function hexToRgba(hex, pct) {
+    const n = parseInt(hex.replace('#',''), 16);
+    return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${pct/100})`;
+  }
+
+  /* smart grid for a given orientation */
+  function autoGrid(n, tpl) {
+    const portrait = tpl === 'portrait';
+    if (n === 1) return { cols:1, rows:1 };
+    if (n === 2) return portrait ? { cols:1, rows:2 } : { cols:2, rows:1 };
+    if (n === 3) return portrait ? { cols:1, rows:3 } : { cols:3, rows:1 };
+    if (n === 4) return { cols:2, rows:2 };
+    if (n === 5) return portrait ? { cols:2, rows:3 } : { cols:3, rows:2 }; // 5 cells in 2x3 or 3x2
+    if (n === 6) return portrait ? { cols:2, rows:3 } : { cols:3, rows:2 };
+    if (n === 7) return portrait ? { cols:2, rows:4 } : { cols:4, rows:2 };
+    if (n === 8) return portrait ? { cols:2, rows:4 } : { cols:4, rows:2 };
+    if (n === 9) return { cols:3, rows:3 };
+    return { cols:3, rows: Math.ceil(n/3) };
+  }
+
+  function getLayout(n, mode, tpl) {
+    if (mode === 'row') return { cols:n, rows:1 };
+    if (mode === 'col') return { cols:1, rows:n };
+    if (mode === 'grid') {
+      const cols = n<=2?2 : n<=4?2 : 3;
+      return { cols, rows: Math.ceil(n/cols) };
+    }
+    return autoGrid(n, tpl);
+  }
+
+  function drawFit(c, img, x, y, w, h, mode) {
+    if (mode === 'cover') {
+      const scale = Math.max(w/img.width, h/img.height);
+      const sw = img.width*scale, sh = img.height*scale;
+      c.drawImage(img, x+(w-sw)/2, y+(h-sh)/2, sw, sh);
+    } else {
+      const scale = Math.min(w/img.width, h/img.height);
+      const sw = img.width*scale, sh = img.height*scale;
+      c.drawImage(img, x+(w-sw)/2, y+(h-sh)/2, sw, sh);
+    }
+  }
+
+  function drawLabel(c, W, H) {
+    const text = labelText.value.trim();
+    if (!text) return;
+    const fs  = Math.max(12, Math.min(200, parseInt(fontSize.value)||36));
+    const fc  = fontColor.value;
+    const ff  = fontFamily.value;
+    const fw  = fontWeight.value;
+    const op  = Math.max(0, Math.min(100, parseInt(labelBgOpacity.value)||0));
+    const lbg = hexToRgba(labelBg.value, op);
+    const pos = labelPos.value;
+    const shadow = shadowToggle.value === '1';
+    c.font = `${fw} ${fs}px ${ff}`;
+    const VPAD = Math.round(fs*0.55);
+    const LH   = fs + VPAD*2;
+    let ly = pos==='top' ? 0 : pos==='center' ? Math.round((H-LH)/2) : H-LH;
+    if (op > 0) { c.fillStyle = lbg; c.fillRect(0, ly, W, LH); }
+    if (shadow) {
+      c.shadowColor = 'rgba(0,0,0,0.6)';
+      c.shadowBlur  = Math.round(fs*0.18);
+      c.shadowOffsetX = 0; c.shadowOffsetY = Math.round(fs*0.06);
+    }
+    c.fillStyle = fc; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(text, W/2, ly+LH/2);
+    c.shadowColor='transparent'; c.shadowBlur=0; c.shadowOffsetX=0; c.shadowOffsetY=0;
+  }
+
+  function drawWatermark(c, W, H) {
+    if ($('wmEnable').value !== '1') return;
+    const text = $('wmText').value.trim();
+    if (!text) return;
+
+    const fs      = Math.max(10, Math.min(120, parseInt($('wmFontSize').value) || 28));
+    const color   = $('wmColor').value;
+    const opacity = Math.max(5, Math.min(100, parseInt($('wmOpacity').value) || 70)) / 100;
+    const bgHex   = $('wmBg').value;
+    const bgOp    = Math.max(0, Math.min(100, parseInt($('wmBgOpacity').value) || 0));
+    const shadow  = $('wmShadow').value === '1';
+    const pos     = $('wmPos').value;
+
+    c.save();
+    c.font = `500 ${fs}px sans-serif`;
+    const tw   = c.measureText(text).width;
+    const PAD  = Math.round(fs * 0.5);
+    const boxW = tw + PAD * 2;
+    const boxH = fs + PAD * 1.2;
+    const MARGIN = Math.round(fs * 0.6);
+
+    let bx = pos.endsWith('r') ? W - boxW - MARGIN : MARGIN;
+    let by = pos.startsWith('b') ? H - boxH - MARGIN : MARGIN;
+
+    /* background pill */
+    if (bgOp > 0) {
+      const n = parseInt(bgHex.replace('#',''), 16);
+      c.fillStyle = `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${bgOp/100})`;
+      const r = Math.round(boxH * 0.3);
+      c.beginPath();
+      c.moveTo(bx+r, by);
+      c.lineTo(bx+boxW-r, by);
+      c.quadraticCurveTo(bx+boxW, by, bx+boxW, by+r);
+      c.lineTo(bx+boxW, by+boxH-r);
+      c.quadraticCurveTo(bx+boxW, by+boxH, bx+boxW-r, by+boxH);
+      c.lineTo(bx+r, by+boxH);
+      c.quadraticCurveTo(bx, by+boxH, bx, by+boxH-r);
+      c.lineTo(bx, by+r);
+      c.quadraticCurveTo(bx, by, bx+r, by);
+      c.closePath();
+      c.fill();
+    }
+
+    /* shadow */
+    if (shadow) {
+      c.shadowColor   = 'rgba(0,0,0,0.55)';
+      c.shadowBlur    = Math.round(fs * 0.2);
+      c.shadowOffsetX = 0;
+      c.shadowOffsetY = Math.round(fs * 0.05);
+    }
+
+    /* text */
+    const n = parseInt(color.replace('#',''), 16);
+    c.fillStyle    = `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${opacity})`;
+    c.textAlign    = 'left';
+    c.textBaseline = 'middle';
+    c.fillText(text, bx + PAD, by + boxH / 2);
+
+    c.shadowColor='transparent'; c.shadowBlur=0; c.shadowOffsetX=0; c.shadowOffsetY=0;
+    c.restore();
+  }
+
+  /* ── core render ── */
+  function renderToCanvas(targetCanvas, targetCtx) {
+    const n    = state.needed;
+    const imgs = state.images.slice(0, n);
+    const tpl  = state.template;
+    const dim  = TEMPLATES[tpl];
+
+    const gap  = parseInt(gapSize.value) || 0;
+    const bg   = bgColor.value;
+    const fit  = fitMode.value;
+    const { cols, rows } = getLayout(n, layoutMode.value, tpl);
+
+    const W = dim.w, H = dim.h;
+    targetCanvas.width  = W;
+    targetCanvas.height = H;
+
+    targetCtx.fillStyle = bg;
+    targetCtx.fillRect(0, 0, W, H);
+
+    if (imgs.length === 0) return;
+
+    /* cell sizes — non-uniform last row support */
+    const totalGapX = (cols+1)*gap;
+    const totalGapY = (rows+1)*gap;
+    const cellW = Math.floor((W - totalGapX) / cols);
+    const cellH = Math.floor((H - totalGapY) / rows);
+
+    imgs.forEach((img, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x   = gap + col*(cellW+gap);
+      const y   = gap + row*(cellH+gap);
+      targetCtx.fillStyle = bg;
+      targetCtx.fillRect(x, y, cellW, cellH);
+      targetCtx.save();
+      targetCtx.beginPath();
+      targetCtx.rect(x, y, cellW, cellH);
+      targetCtx.clip();
+      drawFit(targetCtx, img, x, y, cellW, cellH, fit);
+      targetCtx.restore();
+    });
+
+    drawLabel(targetCtx, W, H);
+    drawWatermark(targetCtx, W, H);
+  }
+
+  function render() {
+    const n = state.needed;
+    const imgs = state.images.slice(0, n);
+    const tpl = state.template;
+
+    if (imgs.length === 0) {
+      mainCanvas.style.display = 'none';
+      emptyHint.style.display  = '';
+      phoneCanvas.style.display    = 'none';
+      lsCanvas.style.display       = 'none';
+      return;
+    }
+
+    emptyHint.style.display = 'none';
+    mainCanvas.style.display = 'block';
+
+    /* render main canvas */
+    renderToCanvas(mainCanvas, ctx);
+
+    /* render mini preview canvases */
+    if (tpl === 'portrait') {
+      renderToCanvas(phoneCanvas, pctx);
+      phoneCanvas.style.display = 'block';
+    } else if (tpl === 'landscape') {
+      renderToCanvas(lsCanvas, lctx);
+      lsCanvas.style.display = 'block';
+    } else {
+      // square — just show main, no device preview
+      phoneCanvas.style.display = 'none';
+      lsCanvas.style.display    = 'none';
+    }
+  }
+
+  /* ── template switching ── */
+  function applyTemplate(tpl) {
+    state.template = tpl;
+
+    /* update button styles */
+    ['tplPortrait','tplLandscape','tplSquare'].forEach(id => $( id).classList.remove('active'));
+    const map = { portrait:'tplPortrait', landscape:'tplLandscape', square:'tplSquare' };
+    $(map[tpl]).classList.add('active');
+
+    /* show/hide device mockups */
+    phoneShell.classList.toggle('visible',    tpl === 'portrait');
+    landscapeShell.classList.toggle('visible', tpl === 'landscape');
+
+    /* adjust default layout for template */
+    if (tpl === 'portrait') {
+      if (layoutMode.value === 'row') layoutMode.value = 'auto';
+    } else if (tpl === 'landscape') {
+      if (layoutMode.value === 'col') layoutMode.value = 'auto';
+    }
+
+    render();
+  }
+
+  /* ── thumbnails ── */
+  function buildThumbs() {
+    thumbStrip.innerHTML = '';
+    state.images.forEach((img, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'thumb';
+      const el = document.createElement('img'); el.src = img.src;
+      wrap.appendChild(el);
+      const num = document.createElement('span'); num.className='thumb-num'; num.textContent=i+1;
+      wrap.appendChild(num);
+      const del = document.createElement('button'); del.className='del'; del.textContent='×'; del.title='移除';
+      del.addEventListener('click', e => { e.stopPropagation(); state.images.splice(i,1); updateAll(); });
+      wrap.appendChild(del);
+      thumbStrip.appendChild(wrap);
+    });
+  }
+
+  function updateBadge() {
+    const got = Math.min(state.images.length, state.needed);
+    countBadge.textContent = `已选 ${got} / ${state.needed}`;
+  }
+
+  function updateAll() { updateBadge(); buildThumbs(); render(); }
+
+  /* ── file loading ── */
+  function loadFiles(files) {
+    const remaining = state.needed - state.images.length;
+    const toLoad = Array.from(files).slice(0, Math.max(0, remaining));
+    if (!toLoad.length) return;
+    let done = 0;
+    toLoad.forEach(f => {
+      const img = new Image();
+      img.onload  = () => { state.images.push(img); done++; if (done===toLoad.length) updateAll(); };
+      img.onerror = () => { done++; if (done===toLoad.length) updateAll(); };
+      img.src = URL.createObjectURL(f);
+    });
+  }
+
+  /* ── events ── */
+  fileInput.addEventListener('change', e => loadFiles(e.target.files));
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+  dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('over'); loadFiles(e.dataTransfer.files); });
+
+  colCount.addEventListener('change', () => {
+    state.needed = parseInt(colCount.value);
+    state.images = state.images.slice(0, state.needed);
+    updateAll();
+  });
+
+  $('tplPortrait').addEventListener('click',  () => applyTemplate('portrait'));
+  $('tplLandscape').addEventListener('click', () => applyTemplate('landscape'));
+  $('tplSquare').addEventListener('click',    () => applyTemplate('square'));
+
+  const redrawInputs = [layoutMode,gapSize,bgColor,fitMode,labelText,fontSize,fontColor,fontFamily,fontWeight,labelPos,labelBg,labelBgOpacity,shadowToggle,
+    $('wmEnable'),$('wmText'),$('wmPos'),$('wmFontSize'),$('wmColor'),$('wmOpacity'),$('wmBg'),$('wmBgOpacity'),$('wmShadow')];
+  redrawInputs.forEach(el => { el.addEventListener('input',render); el.addEventListener('change',render); });
+
+  $('clearBtn').addEventListener('click', () => { state.images=[]; updateAll(); });
+
+  $('downloadBtn').addEventListener('click', () => {
+    if (!state.images.length) return;
+    const a = document.createElement('a');
+    const tplLabel = TEMPLATES[state.template].label.replace(/[: \/]/g,'');
+    a.download = `拼图_${tplLabel}_${Date.now()}.png`;
+    a.href = mainCanvas.toDataURL('image/png');
+    a.click();
+  });
+
+  /* init */
+  updateAll();
+})();
+</script>
+</body>
+</html>

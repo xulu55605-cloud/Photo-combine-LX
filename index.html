@@ -1,1027 +1,1729 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>照片拼接工具 🌸</title>
-  <!-- PWA Support -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#ff8fa3">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拼图工坊</title>
+<style>
+/* ─── Design tokens ─────────────────────────────────────────────────────── */
+:root {
+  --ink:      #0f0f0e;
+  --ink-2:    #3a3935;
+  --ink-3:    #7a7874;
+  --paper:    #faf9f7;
+  --card:     #ffffff;
+  --card-2:   #f3f2ef;
+  --line:     rgba(0,0,0,.08);
+  --line-2:   rgba(0,0,0,.16);
+  --accent:   #e85d3a;
+  --accent-h: #d44e2c;
+  --accent-s: rgba(232,93,58,.12);
+  --green:    #2da770;
+  --r:        10px;
+  --shadow-s: 0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-m: 0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.05);
+  --shadow-l: 0 12px 40px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ink:#edece8; --ink-2:#b5b3ad; --ink-3:#6b6965;
+    --paper:#131310; --card:#1d1d1a; --card-2:#272724;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --accent:#f0724f; --accent-h:#e85d3a; --accent-s:rgba(240,114,79,.15);
+  }
+}
 
-    :root {
-      /* 马卡龙粉嫩色系 */
-      --bg: #fff5f6;                /* 极淡粉底色 */
-      --surface: #ffffff;           /* 纯白卡片 */
-      --surface-2: #fff0f2;         /* 浅蜜桃粉 */
-      --border: rgba(255, 182, 193, 0.4);       /* 柔和粉樱边框 */
-      --border-strong: rgba(255, 105, 180, 0.3);/* 深粉色边框 */
-      --text: #5c4245;              /* 柔和深可可褐 */
-      --text-sub: #8c6a6e;          /* 灰粉褐 */
-      --text-muted: #bfa3a6;        /* 淡灰粉 */
-      --accent: #ff8fa3;            /* 樱花粉 */
-      --accent-hover: #ff758f;      /* 蜜桃深粉 */
-      --accent-on: #ffffff;
-      --radius: 12px;
-      --shadow-sm: 0 4px 12px rgba(255, 182, 193, 0.15);
-      --shadow-md: 0 8px 24px rgba(255, 182, 193, 0.25);
-    }
+*,::before,::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);min-height:100vh;display:flex;flex-direction:column}
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #2d1b1e;
-        --surface: #3d2529;
-        --surface-2: #4a2e33;
-        --border: rgba(255, 143, 163, 0.2);
-        --border-strong: rgba(255, 143, 163, 0.35);
-        --text: #ffe0e3;
-        --text-sub: #f0b4bc;
-        --text-muted: #bc8f95;
-        --accent: #ff758f;
-        --accent-hover: #ff8fa3;
-        --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
-        --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
-      }
-    }
+/* ─── Layout ────────────────────────────────────────────────────────────── */
+.app{display:grid;grid-template-columns:320px 1fr;grid-template-rows:auto 1fr;height:100vh;overflow:hidden}
+.topbar{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:0 20px;height:52px;border-bottom:1px solid var(--line);background:var(--card)}
+.sidebar{overflow-y:auto;border-right:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;gap:0}
+.workspace{overflow:hidden;background:var(--paper);display:flex;flex-direction:column}
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-                   'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 30px 16px 48px;
-      transition: background-color 0.3s;
-    }
+/* ─── Topbar ────────────────────────────────────────────────────────────── */
+.logo{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.3px}
+.logo-dot{width:20px;height:20px;background:var(--accent);border-radius:5px;display:grid;place-items:center}
+.logo-dot svg{display:block}
+.topbar-spacer{flex:1}
+.top-tpl{display:flex;gap:6px}
+.tpl-chip{display:flex;align-items:center;gap:6px;padding:0 12px;height:32px;border-radius:20px;border:1px solid var(--line-2);background:transparent;color:var(--ink-2);font-size:12.5px;font-family:var(--font);cursor:pointer;transition:all .15s;white-space:nowrap}
+.tpl-chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-s)}
+.tpl-chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.tpl-chip svg{flex-shrink:0}
+.btn-dl{display:flex;align-items:center;gap:7px;padding:0 16px;height:34px;background:var(--accent);color:#fff;border:none;border-radius:20px;font-size:13px;font-family:var(--font);cursor:pointer;transition:background .15s;font-weight:500}
+.btn-dl:hover{background:var(--accent-h)}
+.btn-dl svg{flex-shrink:0}
 
-    .container { max-width: 960px; margin: 0 auto; }
+/* ─── Sidebar sections ──────────────────────────────────────────────────── */
+.sec{border-bottom:1px solid var(--line);padding:14px 16px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;margin-bottom:0}
+.sec-head.open{margin-bottom:12px}
+.sec-title{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.sec-caret{width:16px;height:16px;color:var(--ink-3);transition:transform .2s}
+.sec-caret.open{transform:rotate(180deg)}
+.sec-body{display:none}
+.sec-body.open{display:block}
 
-    h1 { 
-      font-size: 26px; 
-      font-weight: 600; 
-      margin-bottom: 6px; 
-      color: var(--accent-hover);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .subtitle { font-size: 14px; color: var(--text-sub); margin-bottom: 24px; }
+/* ─── Form controls ─────────────────────────────────────────────────────── */
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;color:var(--ink-3);font-weight:500}
+select,input[type=text],input[type=number]{
+  height:30px;font-size:12.5px;border:1px solid var(--line-2);border-radius:6px;
+  background:var(--card-2);color:var(--ink);padding:0 8px;outline:none;font-family:var(--font);
+  transition:border-color .15s,box-shadow .15s}
+select:focus,input[type=text]:focus,input[type=number]:focus{
+  border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-s)}
+input[type=color]{width:30px;height:30px;border:1px solid var(--line-2);border-radius:6px;background:var(--card-2);padding:2px;cursor:pointer;outline:none}
+input[type=number]{width:62px}
+input[type=text]{width:100%;flex:1}
+.field-row{display:flex;align-items:flex-end;gap:6px}
+.field-row .field{flex:1}
+.unit{font-size:11px;color:var(--ink-3);padding-bottom:6px;white-space:nowrap}
+.chip-group{display:flex;gap:4px;flex-wrap:wrap}
+.chip{padding:0 10px;height:28px;border-radius:6px;border:1px solid var(--line-2);background:var(--card-2);color:var(--ink-2);font-size:12px;font-family:var(--font);cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.active{background:var(--accent-s);border-color:var(--accent);color:var(--accent);font-weight:500}
+.slider-wrap{display:flex;align-items:center;gap:8px}
+.slider-wrap input[type=range]{flex:1;height:3px;accent-color:var(--accent);cursor:pointer}
+.slider-val{font-size:11px;color:var(--ink-3);width:28px;text-align:right}
+.toggle-row{display:flex;align-items:center;justify-content:space-between}
+.toggle-row label{font-size:12.5px;color:var(--ink-2)}
+.toggle{position:relative;width:34px;height:19px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;border-radius:20px;background:var(--line-2);cursor:pointer;transition:background .2s}
+.toggle input:checked+.toggle-track{background:var(--accent)}
+.toggle-track::after{content:'';position:absolute;width:13px;height:13px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle input:checked+.toggle-track::after{transform:translateX(15px)}
+.divider{height:1px;background:var(--line);margin:10px 0}
 
-    /* ── Template switcher ── */
-    .tpl-bar {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 12px 18px;
-      align-items: center;
-      flex-wrap: wrap;
-      box-shadow: var(--shadow-sm);
-    }
-    .tpl-label { font-size: 13px; color: var(--text-sub); font-weight: 600; margin-right: 4px; white-space: nowrap; }
-    .tpl-btn {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      padding: 0 16px;
-      height: 38px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text-sub);
-      font-size: 13px;
-      font-family: inherit;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-weight: 500;
-    }
-    .tpl-btn:hover { 
-      background: var(--surface-2); 
-      color: var(--accent-hover); 
-      border-color: var(--accent);
-      transform: translateY(-1px);
-    }
-    .tpl-btn.active {
-      background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-      color: #fff;
-      border-color: transparent;
-      box-shadow: 0 4px 10px rgba(255, 117, 143, 0.4);
-    }
-    .tpl-btn svg { flex-shrink: 0; }
-    .tpl-hint {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-left: auto;
-      white-space: nowrap;
-    }
+/* ─── Upload strip ──────────────────────────────────────────────────────── */
+.upload-strip{padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
+.upload-btn{width:100%;height:44px;border:1.5px dashed var(--line-2);border-radius:8px;background:transparent;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12.5px;color:var(--ink-3);cursor:pointer;transition:all .15s;font-family:var(--font)}
+.upload-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-s)}
+.upload-btn.over{border-color:var(--accent);background:var(--accent-s)}
+.badge{display:inline-flex;align-items:center;background:var(--accent-s);color:var(--accent);border-radius:20px;padding:1px 8px;font-size:11px;font-weight:600;margin-left:4px}
+.thumb-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.thumb{position:relative;width:52px;height:52px;border-radius:6px;overflow:hidden;border:1px solid var(--line);cursor:grab;flex-shrink:0}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .del{position:absolute;top:1px;right:1px;width:16px;height:16px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;opacity:0;transition:opacity .15s}
+.thumb:hover .del{opacity:1}
+.thumb-n{position:absolute;bottom:1px;left:3px;font-size:9px;color:#fff;background:rgba(0,0,0,.4);border-radius:3px;padding:0 3px}
 
-    /* ── Panels ── */
-    .panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 18px 22px;
-      margin-bottom: 16px;
-      box-shadow: var(--shadow-sm);
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .panel:hover {
-      box-shadow: var(--shadow-md);
-    }
-    .panel-title {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--accent-hover);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .panel-title::before {
-      content: '';
-      display: inline-block;
-      width: 4px;
-      height: 12px;
-      background: var(--accent);
-      border-radius: 2px;
-    }
-    .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
-    .field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-sub); }
-    .field label { white-space: nowrap; font-weight: 500; }
+/* ─── Workspace canvas area ─────────────────────────────────────────────── */
+.ws-toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--card);flex-shrink:0}
+.ws-info{font-size:11.5px;color:var(--ink-3);margin-left:auto}
+.ws-hint{font-size:11px;color:var(--ink-3);display:flex;align-items:center;gap:5px}
+.ws-hint svg{flex-shrink:0}
+.ws-scroll{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px}
 
-    select, input[type="text"], input[type="number"] {
-      height: 34px; font-size: 13px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--surface-2);
-      color: var(--text); padding: 0 12px; outline: none;
-      transition: all 0.2s;
-    }
-    select:focus, input[type="text"]:focus, input[type="number"]:focus {
-      border-color: var(--accent-hover);
-      background: var(--surface);
-      box-shadow: 0 0 0 3px rgba(255, 143, 163, 0.25);
-    }
-    select {
-      cursor: pointer;
-      padding-right: 20px;
-    }
-    input[type="color"] {
-      width: 40px; height: 34px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--surface-2);
-      padding: 3px; cursor: pointer; outline: none;
-      transition: transform 0.1s;
-    }
-    input[type="color"]:hover {
-      transform: scale(1.05);
-    }
-    input[type="number"] { width: 72px; }
-    input[type="text"]   { width: 200px; }
+/* ─── Canvas stage ──────────────────────────────────────────────────────── */
+#stage{position:relative;background:#fff;box-shadow:var(--shadow-l);flex-shrink:0;display:block}
+#stage canvas{display:block;pointer-events:none}
+.cell-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.cell-handle{
+  position:absolute;
+  border:2px solid transparent;
+  border-radius:2px;
+  cursor:move;
+  pointer-events:all;
+  transition:border-color .12s, box-shadow .12s;
+  overflow:hidden;
+}
+.cell-handle:hover{border-color:rgba(255,255,255,.7);box-shadow:0 0 0 1px rgba(0,0,0,.3),inset 0 0 0 1px rgba(255,255,255,.3)}
+.cell-handle.selected{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+.cell-toolbar{
+  position:absolute;bottom:-38px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:4px;
+  background:rgba(20,20,18,.88);backdrop-filter:blur(8px);
+  border-radius:20px;padding:4px 8px;
+  opacity:0;pointer-events:none;transition:opacity .15s;
+  white-space:nowrap;z-index:10;
+}
+.cell-handle.selected .cell-toolbar{opacity:1;pointer-events:all}
+.ct-btn{background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px;display:flex;align-items:center;gap:4px;transition:color .12s,background .12s;font-family:var(--font)}
+.ct-btn:hover{color:#fff;background:rgba(255,255,255,.12)}
+.ct-sep{width:1px;height:14px;background:rgba(255,255,255,.2);margin:0 2px}
+.ct-zoom{display:flex;align-items:center;gap:2px;color:rgba(255,255,255,.7);font-size:11px}
+.ct-zoom input[type=range]{width:70px;height:2px;accent-color:var(--accent);cursor:pointer}
 
-    /* ── Upload ── */
-    .upload-zone {
-      border: 2px dashed var(--accent);
-      background: rgba(255, 240, 242, 0.5);
-      border-radius: 16px; padding: 32px 20px;
-      text-align: center; cursor: pointer;
-      color: var(--text-sub); font-size: 14px;
-      transition: all 0.2s ease;
-      margin-bottom: 16px;
-      box-shadow: inset 0 2px 8px rgba(255, 182, 193, 0.1);
-    }
-    .upload-zone:hover, .upload-zone.over {
-      background: var(--surface-2); 
-      border-color: var(--accent-hover); 
-      color: var(--accent-hover);
-      transform: scale(1.01);
-    }
-    .upload-zone svg { display: block; margin: 0 auto 10px; color: var(--accent); transition: transform 0.2s; }
-    .upload-zone:hover svg { transform: translateY(-3px); }
-    .badge {
-      display: inline-flex; align-items: center;
-      background: var(--accent); color: #fff;
-      border-radius: 20px; padding: 3px 12px;
-      font-size: 11px; font-weight: 600; margin-left: 8px;
-      box-shadow: 0 2px 6px rgba(255, 117, 143, 0.3);
-    }
+/* device previews in sidebar */
+.device-preview{display:flex;gap:12px;justify-content:center;padding:12px 0 4px}
+.dev-wrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.dev-label{font-size:10px;color:var(--ink-3)}
+.dev-phone{border:2.5px solid var(--line-2);border-radius:14px;background:#111;padding:5px 3px;display:flex;flex-direction:column;align-items:center}
+.dev-notch{width:28px;height:5px;background:var(--line-2);border-radius:0 0 4px 4px;margin-bottom:3px}
+.dev-screen{border-radius:2px;overflow:hidden;background:#000}
+.dev-home{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--line-2);margin-top:3px}
+.dev-ls{border:2.5px solid var(--line-2);border-radius:10px;background:#111;padding:3px 5px;display:flex;align-items:center;gap:3px}
+.dev-ls-notch{width:5px;height:22px;background:var(--line-2);border-radius:0 3px 3px 0}
+.dev-ls-screen{border-radius:2px;overflow:hidden;background:#000}
 
-    /* ── Preview area ── */
-    .preview-area {
-      display: flex;
-      gap: 18px;
-      align-items: flex-start;
-      margin-bottom: 16px;
-    }
+/* empty state */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:3rem;color:var(--ink-3);text-align:center;flex:1}
+.empty-state svg{opacity:.3}
+.empty-state p{font-size:13px;line-height:1.6;max-width:220px}
 
-    /* Phone mockup shell */
-    .phone-shell {
-      flex-shrink: 0;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-    }
-    .phone-shell.visible { display: flex; }
-    .phone-frame {
-      border: 6px solid var(--text-sub);
-      border-radius: 36px;
-      background: #fff;
-      padding: 12px 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      position: relative;
-      box-shadow: var(--shadow-md);
-    }
-    .phone-notch {
-      width: 70px; height: 12px;
-      background: var(--text-sub);
-      border-radius: 0 0 12px 12px;
-      margin-bottom: 8px;
-    }
-    .phone-screen {
-      width: 150px;
-      overflow: hidden;
-      border-radius: 6px;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-    }
-    .phone-screen canvas { width: 100% !important; height: auto !important; display: block; }
-    .phone-home {
-      width: 28px; height: 28px; border-radius: 50%;
-      border: 3px solid var(--text-sub);
-      margin-top: 8px;
-    }
-    .phone-label { font-size: 11px; color: var(--text-sub); margin-top: 8px; font-weight: 600; }
+/* ─── Annotation toolbar ─── */
+.anno-bar{display:flex;align-items:center;gap:4px;padding:6px 10px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap}
+.anno-sep{width:1px;height:22px;background:var(--line-2);margin:0 4px;flex-shrink:0}
+.anno-tool{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:7px;border:1px solid transparent;background:transparent;cursor:pointer;color:var(--ink-2);transition:all .12s;flex-shrink:0;font-family:var(--font)}
+.anno-tool:hover{background:var(--card-2);border-color:var(--line-2);color:var(--ink)}
+.anno-tool.active{background:var(--accent-s);border-color:var(--accent);color:var(--accent)}
+.anno-label{font-size:11px;color:var(--ink-3);white-space:nowrap;padding:0 2px}
+.anno-color{width:28px;height:28px;border-radius:6px;border:2px solid var(--line-2);padding:2px;cursor:pointer;background:var(--card-2);outline:none}
+.anno-size-wrap{display:flex;align-items:center;gap:6px}
+.anno-size-wrap input[type=range]{width:68px;height:3px;accent-color:var(--accent);cursor:pointer}
+.anno-size-val{font-size:11px;color:var(--accent);min-width:22px}
+.anno-btn{height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--line-2);background:var(--card-2);color:var(--ink-2);font-size:12px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .12s;white-space:nowrap}
+.anno-btn:hover{border-color:var(--accent);color:var(--accent)}
+.anno-btn:disabled{opacity:.35;cursor:not-allowed}
+#annoCanvas{position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none}
+#annoCanvas.tool-draw{cursor:crosshair}
+#annoCanvas.tool-text{cursor:text}
+#annoCanvas.tool-select{cursor:default}
+#annoCanvas.tool-erase{cursor:cell}
+#textInputProxy{position:absolute;display:none;background:rgba(255,255,255,.95);backdrop-filter:blur(6px);border:2px solid var(--accent);border-radius:7px;padding:6px 10px;font-family:var(--font);color:#111;outline:none;min-width:100px;max-width:300px;box-shadow:0 4px 20px rgba(0,0,0,.2);resize:none;overflow:hidden;z-index:300;line-height:1.5}
+.anno-obj-wrap{position:absolute;pointer-events:all}
+.anno-obj-wrap .del-btn{position:absolute;top:-9px;right:-9px;width:18px;height:18px;background:var(--accent);color:#fff;border:none;border-radius:50%;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.anno-obj-wrap.sel .del-btn{display:flex}
+.anno-obj-wrap.sel{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
 
-    /* Landscape mockup */
-    .landscape-shell {
-      flex-shrink: 0;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-    }
-    .landscape-shell.visible { display: flex; }
-    .landscape-frame {
-      border: 6px solid var(--text-sub);
-      border-radius: 20px;
-      background: #fff;
-      padding: 8px 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: var(--shadow-md);
-    }
-    .landscape-notch {
-      width: 12px; height: 60px;
-      background: var(--text-sub);
-      border-radius: 0 12px 12px 0;
-    }
-    .landscape-screen {
-      height: 150px;
-      overflow: hidden;
-      border-radius: 6px;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-    }
-    .landscape-screen canvas { height: 100% !important; width: auto !important; display: block; }
-    .landscape-label { font-size: 11px; color: var(--text-sub); margin-top: 8px; font-weight: 600; }
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:10px}
 
-    .canvas-wrap {
-      flex: 1;
-      background: var(--surface-2);
-      border-radius: 16px;
-      border: 2px dashed var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 250px;
-      overflow: hidden;
-      box-shadow: inset 0 2px 10px rgba(255, 182, 193, 0.05);
-    }
-    #mainCanvas { display: none; max-width: 100%; max-height: 65vh; border-radius: 8px; box-shadow: var(--shadow-sm); }
-    .empty-hint {
-      text-align: center; color: var(--text-muted); font-size: 14px; padding: 4rem 2rem;
-    }
-    .empty-hint svg { display: block; margin: 0 auto 12px; color: var(--accent); opacity: .6; }
-
-    /* ── Thumbs ── */
-    .thumb-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
-    .thumb {
-      position: relative; width: 72px; height: 72px;
-      border-radius: 10px; overflow: hidden;
-      border: 2px solid var(--border); flex-shrink: 0;
-      box-shadow: var(--shadow-sm);
-      transition: transform 0.15s;
-    }
-    .thumb:hover {
-      transform: scale(1.05);
-      border-color: var(--accent);
-    }
-    .thumb img { width: 100%; height: 100%; object-fit: cover; }
-    .thumb .del {
-      position: absolute; top: 3px; right: 3px;
-      width: 20px; height: 20px;
-      background: rgba(255, 117, 143, 0.9); color: #fff;
-      border: none; border-radius: 50%; font-size: 12px;
-      cursor: pointer; display: flex; align-items: center; justify-content: center;
-      padding: 0; line-height: 1;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-      transition: background 0.1s;
-    }
-    .thumb .del:hover { background: #ff4d6d; }
-    .thumb-num {
-      position: absolute; bottom: 3px; left: 4px;
-      font-size: 10px; color: #fff; font-weight: bold;
-      background: rgba(92, 66, 69, 0.75); border-radius: 4px; padding: 1px 5px;
-    }
-
-    /* ── Buttons ── */
-    .actions { display: flex; gap: 12px; justify-content: flex-end; }
-    button {
-      height: 40px; padding: 0 20px; border-radius: var(--radius);
-      font-size: 13px; font-family: inherit; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 8px;
-      transition: all 0.2s ease;
-      border: 1px solid var(--border-strong);
-      background: var(--surface); color: var(--text-sub);
-      font-weight: 600;
-    }
-    button:hover { 
-      background: var(--surface-2); 
-      border-color: var(--accent);
-      color: var(--accent-hover);
-    }
-    button:active { transform: scale(0.96); }
-    button.primary { 
-      background: linear-gradient(135deg, var(--accent), var(--accent-hover)); 
-      color: #fff; 
-      border-color: transparent;
-      box-shadow: 0 4px 12px rgba(255, 117, 143, 0.35);
-    }
-    button.primary:hover { 
-      background: linear-gradient(135deg, var(--accent-hover), #ff4d6d); 
-      box-shadow: 0 6px 16px rgba(255, 117, 143, 0.45);
-    }
-
-    @media (max-width: 600px) {
-      .row { gap: 10px; }
-      input[type="text"] { width: 150px; }
-      .tpl-hint { display: none; }
-    }
-  </style>
+@media(max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}
+  .sidebar{max-height:45vh;border-right:none;border-bottom:1px solid var(--line)}
+  .topbar{padding:0 12px}
+  .top-tpl{display:none}
+}
+</style>
 </head>
 <body>
-<div class="container">
+<div class="app">
 
-  <h1>📷 照片拼接工具 🌸</h1>
-  <p class="subtitle">导入多张照片，拼合为大图，支持竖屏 / 横屏 / 方形三种模板，叠加文字后下载</p>
-
-  <!-- ── 模板切换 ── -->
-  <div class="tpl-bar">
-    <span class="tpl-label">输出模板：</span>
-
-    <button class="tpl-btn active" id="tplPortrait">
-      <!-- 竖屏手机 icon -->
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="5" y="2" width="14" height="20" rx="3"/>
-        <circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/>
+<!-- ── Topbar ── -->
+<header class="topbar">
+  <div class="logo">
+    <div class="logo-dot">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <rect x="1" y="1" width="4" height="4" rx="1" fill="white"/>
+        <rect x="7" y="1" width="4" height="4" rx="1" fill="white" opacity=".7"/>
+        <rect x="1" y="7" width="4" height="4" rx="1" fill="white" opacity=".7"/>
+        <rect x="7" y="7" width="4" height="4" rx="1" fill="white" opacity=".5"/>
       </svg>
+    </div>
+    拼图工坊
+  </div>
+
+  <div class="top-tpl" id="tplBar">
+    <button class="tpl-chip active" data-tpl="portrait">
+      <svg width="11" height="14" viewBox="0 0 11 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="1" y="1" width="9" height="12" rx="2"/><line x1="5.5" y1="11" x2="5.5" y2="11"/></svg>
       竖屏 9:16
     </button>
-
-    <button class="tpl-btn" id="tplLandscape">
-      <!-- 横屏 icon -->
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="5" width="20" height="14" rx="3"/>
-        <circle cx="18" cy="12" r="1" fill="currentColor" stroke="none"/>
-      </svg>
+    <button class="tpl-chip" data-tpl="landscape">
+      <svg width="14" height="11" viewBox="0 0 14 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="1" y="1" width="12" height="9" rx="2"/><line x1="11" y1="5.5" x2="11" y2="5.5"/></svg>
       横屏 16:9
     </button>
-
-    <button class="tpl-btn" id="tplSquare">
-      <!-- 方形 icon -->
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="3"/>
-      </svg>
+    <button class="tpl-chip" data-tpl="square">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="1" y="1" width="10" height="10" rx="2"/></svg>
       方形 1:1
     </button>
-
-    <span class="tpl-hint">切换模板会自动调整画布比例与网格布局</span>
   </div>
 
-  <!-- ── 拼接设置 ── -->
-  <div class="panel">
-    <div class="panel-title">拼接设置</div>
-    <div class="row">
-      <div class="field">
-        <label for="colCount">照片数量</label>
-        <select id="colCount">
-          <option value="2">2 张</option>
-          <option value="3">3 张</option>
-          <option value="4" selected>4 张</option>
-          <option value="5">5 张</option>
-          <option value="6">6 张</option>
-          <option value="7">7 张</option>
-          <option value="8">8 张</option>
-          <option value="9">9 张</option>
-        </select>
+  <div class="topbar-spacer"></div>
+
+  <div style="position:relative;display:inline-block" id="exportWrap">
+    <button class="btn-dl" id="downloadBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      导出高清图
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div id="exportMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--line-2);border-radius:10px;box-shadow:var(--shadow-l);padding:12px;min-width:230px;z-index:100">
+      <div style="font-size:11px;color:var(--ink-3);font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">导出设置</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="field">
+          <label>分辨率倍数</label>
+          <select id="exportScale">
+            <option value="1">1× — 标准 (1080p级)</option>
+            <option value="2" selected>2× — 高清 (2K级)</option>
+            <option value="3">3× — 超高清 (3K级)</option>
+            <option value="4">4× — 印刷级 (4K级)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>格式</label>
+          <select id="exportFormat">
+            <option value="png">PNG — 无损，支持透明</option>
+            <option value="jpg">JPEG — 更小文件，不透明</option>
+            <option value="webp">WebP — 现代格式，最小体积</option>
+          </select>
+        </div>
+        <div class="field" id="qualityField">
+          <label>JPEG / WebP 质量 <span id="qualityVal" style="color:var(--accent)">92%</span></label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="range" id="exportQuality" min="60" max="100" value="92" style="flex:1;height:3px;accent-color:var(--accent);cursor:pointer">
+          </div>
+        </div>
+        <div id="exportSizeHint" style="font-size:11px;color:var(--ink-3);background:var(--card-2);border-radius:6px;padding:7px 9px;line-height:1.5"></div>
+        <button class="btn-dl" id="doExportBtn" style="width:100%;justify-content:center;height:36px;border-radius:7px;margin-top:2px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          开始导出
+        </button>
       </div>
-      <div class="field">
-        <label for="layoutMode">网格布局</label>
-        <select id="layoutMode">
-          <option value="auto">自动</option>
-          <option value="grid">均匀网格</option>
-          <option value="row">横排一行</option>
-          <option value="col">竖排一列</option>
-        </select>
+    </div>
+  </div>
+</header>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+
+  <!-- Upload -->
+  <div class="upload-strip">
+    <div class="upload-btn" id="dropzone">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+      </svg>
+      点击 / 拖拽上传照片
+      <span class="badge" id="countBadge">0/4</span>
+    </div>
+    <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+    <div class="thumb-list" id="thumbList"></div>
+  </div>
+
+  <!-- Layout -->
+  <div class="sec">
+    <div class="sec-head open" data-sec="layout">
+      <span class="sec-title">拼接布局</span>
+      <svg class="sec-caret open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="sec-body open" id="sec-layout">
+      <div class="field-row" style="margin-bottom:10px">
+        <div class="field">
+          <label>照片数量</label>
+          <select id="colCount">
+            <option value="2">2 张</option><option value="3">3 张</option>
+            <option value="4" selected>4 张</option><option value="5">5 张</option>
+            <option value="6">6 张</option><option value="7">7 张</option>
+            <option value="8">8 张</option><option value="9">9 张</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>填充方式</label>
+          <select id="fitMode"><option value="cover">裁剪填充</option><option value="contain">完整显示</option></select>
+        </div>
       </div>
-      <div class="field">
-        <label for="gapSize">间距</label>
-        <select id="gapSize">
-          <option value="0">无</option>
-          <option value="4" selected>小</option>
-          <option value="10">中</option>
-          <option value="20">大</option>
-        </select>
+      <div class="field" style="margin-bottom:10px">
+        <label>网格排列</label>
+        <div class="chip-group" id="layoutChips">
+          <button class="chip active" data-layout="auto">自动</button>
+          <button class="chip" data-layout="grid">均匀</button>
+          <button class="chip" data-layout="row">横排</button>
+          <button class="chip" data-layout="col">竖排</button>
+        </div>
       </div>
-      <div class="field">
-        <label for="bgColor">背景色</label>
-        <input type="color" id="bgColor" value="#ffffff">
+      <div class="field" style="margin-bottom:2px">
+        <label>间距 <span id="gapVal" style="color:var(--accent)">4px</span></label>
+        <div class="slider-wrap">
+          <input type="range" id="gapSize" min="0" max="30" value="4">
+        </div>
       </div>
-      <div class="field">
-        <label for="fitMode">填充方式</label>
-        <select id="fitMode">
-          <option value="cover">裁剪填充</option>
-          <option value="contain">完整显示</option>
-        </select>
+      <div class="field-row" style="margin-top:10px">
+        <div class="field"><label>背景色</label><input type="color" id="bgColor" value="#ffffff"></div>
       </div>
     </div>
   </div>
 
-  <!-- ── 标签文字 ── -->
-  <div class="panel">
-    <div class="panel-title">标签文字（可选）</div>
-    <div class="row">
-      <div class="field">
-        <label for="labelText">文字内容</label>
+  <!-- Label -->
+  <div class="sec">
+    <div class="sec-head open" data-sec="label">
+      <span class="sec-title">标签文字</span>
+      <svg class="sec-caret open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="sec-body open" id="sec-label">
+      <div class="field" style="margin-bottom:10px">
+        <label>内容</label>
         <input type="text" id="labelText" placeholder="输入标签文字…">
       </div>
-      <div class="field">
-        <label for="fontSize">字号</label>
-        <input type="number" id="fontSize" value="36" min="12" max="200">
-      </div>
-      <div class="field">
-        <label for="fontColor">字色</label>
-        <input type="color" id="fontColor" value="#ffffff">
-      </div>
-      <div class="field">
-        <label for="fontFamily">字体</label>
-        <select id="fontFamily">
-          <option value="sans-serif">无衬线</option>
-          <option value="serif">衬线</option>
-          <option value="monospace">等宽</option>
-          <option value="cursive">手写</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="fontWeight">粗细</label>
-        <select id="fontWeight">
-          <option value="400">常规</option>
-          <option value="700">加粗</option>
-        </select>
-      </div>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <div class="field">
-        <label for="labelPos">位置</label>
-        <select id="labelPos">
-          <option value="top">顶部</option>
-          <option value="center">居中</option>
-          <option value="bottom">底部</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="labelBg">底色</label>
-        <input type="color" id="labelBg" value="#000000">
-      </div>
-      <div class="field">
-        <label for="labelBgOpacity">底色透明度</label>
-        <input type="number" id="labelBgOpacity" value="0" min="0" max="100">
-        <span style="font-size:13px;color:var(--text-muted)">%</span>
-      </div>
-      <div class="field">
-        <label for="shadowToggle">文字阴影</label>
-        <select id="shadowToggle">
-          <option value="0">关闭</option>
-          <option value="1">开启</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── 水印 ── -->
-  <div class="panel">
-    <div class="panel-title">角落水印（可选）</div>
-    <div class="row">
-      <div class="field">
-        <label for="wmEnable">开启水印</label>
-        <select id="wmEnable">
-          <option value="0">关闭</option>
-          <option value="1">开启</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="wmText">水印内容</label>
-        <input type="text" id="wmText" placeholder="© 你的名字 / 品牌…" style="width:200px">
-      </div>
-      <div class="field">
-        <label for="wmPos">位置</label>
-        <select id="wmPos">
-          <option value="br">右下角</option>
-          <option value="bl">左下角</option>
-          <option value="tr">右上角</option>
-          <option value="tl">左上角</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="wmFontSize">字号</label>
-        <input type="number" id="wmFontSize" value="28" min="10" max="120">
-      </div>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <div class="field">
-        <label for="wmColor">字色</label>
-        <input type="color" id="wmColor" value="#ffffff">
-      </div>
-      <div class="field">
-        <label for="wmOpacity">字色透明度</label>
-        <input type="number" id="wmOpacity" value="70" min="5" max="100">
-        <span style="font-size:13px;color:var(--text-muted)">%</span>
-      </div>
-      <div class="field">
-        <label for="wmBg">底色</label>
-        <input type="color" id="wmBg" value="#000000">
-      </div>
-      <div class="field">
-        <label for="wmBgOpacity">底色透明度</label>
-        <input type="number" id="wmBgOpacity" value="0" min="0" max="100">
-        <span style="font-size:13px;color:var(--text-muted)">%</span>
-      </div>
-      <div class="field">
-        <label for="wmShadow">文字阴影</label>
-        <select id="wmShadow">
-          <option value="1">开启</option>
-          <option value="0">关闭</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Upload ── -->
-  <div class="upload-zone" id="dropzone">
-    <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2"/>
-      <circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-    </svg>
-    点击或拖拽照片到此处上传
-    <span class="badge" id="countBadge">已选 0 / 4</span>
-    <div style="font-size:12px;color:var(--text-muted);margin-top:5px">支持 JPG、PNG、WEBP 等格式</div>
-    <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
-  </div>
-
-  <!-- ── Thumbs ── -->
-  <div class="thumb-strip" id="thumbStrip"></div>
-
-  <!-- ── Preview ── -->
-  <div class="preview-area">
-
-    <!-- 竖屏手机预览 -->
-    <div class="phone-shell visible" id="phoneShell">
-      <div class="phone-frame">
-        <div class="phone-notch"></div>
-        <div class="phone-screen" id="phoneScreen">
-          <canvas id="phoneCanvas"></canvas>
-        </div>
-        <div class="phone-home"></div>
-      </div>
-      <div class="phone-label">手机竖屏预览</div>
-    </div>
-
-    <!-- 横屏预览 -->
-    <div class="landscape-shell" id="landscapeShell">
-      <div class="landscape-frame">
-        <div class="landscape-notch"></div>
-        <div class="landscape-screen" id="landscapeScreen">
-          <canvas id="landscapeCanvas"></canvas>
+      <div class="field-row" style="margin-bottom:10px">
+        <div class="field"><label>字号</label><input type="number" id="fontSize" value="36" min="12" max="200"></div>
+        <div class="field"><label>字色</label><input type="color" id="fontColor" value="#ffffff"></div>
+        <div class="field"><label>粗细</label>
+          <select id="fontWeight"><option value="400">常规</option><option value="700">加粗</option></select>
         </div>
       </div>
-      <div class="landscape-label">手机横屏预览</div>
+      <div class="field-row" style="margin-bottom:10px">
+        <div class="field"><label>字体</label>
+          <select id="fontFamily">
+            <option value="sans-serif">无衬线</option><option value="serif">衬线</option>
+            <option value="monospace">等宽</option><option value="cursive">手写</option>
+          </select>
+        </div>
+        <div class="field"><label>位置</label>
+          <select id="labelPos"><option value="top">顶部</option><option value="center">居中</option><option value="bottom">底部</option></select>
+        </div>
+      </div>
+      <div class="field-row" style="margin-bottom:4px">
+        <div class="field"><label>底色</label><input type="color" id="labelBg" value="#000000"></div>
+        <div class="field">
+          <label>底色透明度 <span id="lbgOpVal" style="color:var(--accent)">0%</span></label>
+          <div class="slider-wrap"><input type="range" id="labelBgOpacity" min="0" max="100" value="0"></div>
+        </div>
+      </div>
+      <div class="toggle-row" style="margin-top:10px">
+        <label>文字阴影</label>
+        <label class="toggle"><input type="checkbox" id="shadowToggle"><span class="toggle-track"></span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Watermark -->
+  <div class="sec">
+    <div class="sec-head" data-sec="wm">
+      <span class="sec-title">角落水印</span>
+      <svg class="sec-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="sec-body" id="sec-wm">
+      <div class="toggle-row" style="margin-bottom:10px">
+        <label>启用水印</label>
+        <label class="toggle"><input type="checkbox" id="wmEnable"><span class="toggle-track"></span></label>
+      </div>
+      <div class="field" style="margin-bottom:10px">
+        <label>水印内容</label>
+        <input type="text" id="wmText" placeholder="© 品牌名 / @你的ID…">
+      </div>
+      <div class="field-row" style="margin-bottom:10px">
+        <div class="field"><label>位置</label>
+          <select id="wmPos">
+            <option value="br">右下</option><option value="bl">左下</option>
+            <option value="tr">右上</option><option value="tl">左上</option>
+          </select>
+        </div>
+        <div class="field"><label>字号</label><input type="number" id="wmFontSize" value="28" min="10" max="120"></div>
+        <div class="field"><label>字色</label><input type="color" id="wmColor" value="#ffffff"></div>
+      </div>
+      <div class="field" style="margin-bottom:8px">
+        <label>字色透明度 <span id="wmOpVal" style="color:var(--accent)">70%</span></label>
+        <div class="slider-wrap"><input type="range" id="wmOpacity" min="5" max="100" value="70"></div>
+      </div>
+      <div class="field-row" style="margin-bottom:8px">
+        <div class="field"><label>底色</label><input type="color" id="wmBg" value="#000000"></div>
+        <div class="field">
+          <label>底色透明度 <span id="wmBgOpVal" style="color:var(--accent)">0%</span></label>
+          <div class="slider-wrap"><input type="range" id="wmBgOpacity" min="0" max="100" value="0"></div>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <label>水印阴影</label>
+        <label class="toggle"><input type="checkbox" id="wmShadow" checked><span class="toggle-track"></span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Device preview -->
+  <div class="sec">
+    <div class="sec-head open" data-sec="preview">
+      <span class="sec-title">设备预览</span>
+      <svg class="sec-caret open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="sec-body open" id="sec-preview">
+      <div class="device-preview">
+        <div class="dev-wrap" id="devPortrait">
+          <div class="dev-phone">
+            <div class="dev-notch"></div>
+            <div class="dev-screen" style="width:72px"><canvas id="phoneCanvas" style="width:100%;display:block"></canvas></div>
+            <div class="dev-home"></div>
+          </div>
+          <div class="dev-label">竖屏</div>
+        </div>
+        <div class="dev-wrap" id="devLandscape" style="display:none">
+          <div class="dev-ls">
+            <div class="dev-ls-notch"></div>
+            <div class="dev-ls-screen" style="height:72px"><canvas id="lsCanvas" style="height:100%;display:block"></canvas></div>
+          </div>
+          <div class="dev-label">横屏</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</aside>
+
+<!-- ── Workspace ── -->
+<main class="workspace">
+
+  <!-- annotation toolbar -->
+  <div class="anno-bar" id="annoBar">
+    <!-- mode: select -->
+    <button class="anno-tool active" id="toolSelect" title="选择 / 移动">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-7 1-4 7z"/></svg>
+    </button>
+    <!-- mode: draw -->
+    <button class="anno-tool" id="toolDraw" title="自由画线">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+    </button>
+    <!-- mode: arrow -->
+    <button class="anno-tool" id="toolArrow" title="箭头">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="9 5 19 5 19 15"/></svg>
+    </button>
+    <!-- mode: rect -->
+    <button class="anno-tool" id="toolRect" title="矩形框">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+    </button>
+    <!-- mode: text -->
+    <button class="anno-tool" id="toolText" title="文本备注">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+    </button>
+    <!-- erase -->
+    <button class="anno-tool" id="toolErase" title="橡皮擦（擦除标注）">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16l10.5-10.5 6.5 6.5-3 3.5"/><path d="m6.5 17.5 5-5"/></svg>
+    </button>
+
+    <div class="anno-sep"></div>
+
+    <span class="anno-label">颜色</span>
+    <input type="color" class="anno-color" id="annoColor" value="#e85d3a">
+
+    <div class="anno-sep"></div>
+    <span class="anno-label">粗细</span>
+    <div class="anno-size-wrap">
+      <input type="range" id="annoSize" min="1" max="30" value="4">
+      <span class="anno-size-val" id="annoSizeVal">4</span>
     </div>
 
-    <!-- 主画布 -->
-    <div class="canvas-wrap" id="canvasWrap">
-      <div class="empty-hint" id="emptyHint">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-        </svg>
-        上传照片后在此预览拼接效果
-      </div>
+    <div class="anno-sep"></div>
+    <span class="anno-label">字号</span>
+    <div class="anno-size-wrap">
+      <input type="range" id="annoFontSize" min="12" max="120" value="32">
+      <span class="anno-size-val" id="annoFontSizeVal">32</span>
+    </div>
+
+    <div class="anno-sep"></div>
+    <button class="anno-btn" id="undoBtn" disabled title="撤销 Ctrl+Z">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+      撤销
+    </button>
+    <button class="anno-btn" id="clearAnnoBtn" title="清除全部标注">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      清除标注
+    </button>
+
+    <div style="flex:1"></div>
+    <span class="ws-info" id="wsInfo">—</span>
+  </div>
+
+  <div class="ws-scroll" id="wsScroll">
+    <div class="empty-state" id="emptyState">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <p>从左侧上传照片<br>开始创作你的拼图</p>
+    </div>
+    <div id="stageWrap" style="display:none;position:relative">
       <canvas id="mainCanvas"></canvas>
+      <canvas id="annoCanvas" class="tool-select"></canvas>
+      <div class="cell-overlay" id="cellOverlay"></div>
+      <textarea id="textInputProxy" rows="1" placeholder="输入文字，Enter 确认…"></textarea>
     </div>
-
   </div>
+</main>
 
-  <!-- ── Actions ── -->
-  <div class="actions">
-    <button id="clearBtn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
-        <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-      </svg>
-      清空照片
-    </button>
-    <button class="primary" id="downloadBtn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-      </svg>
-      下载拼图 PNG
-    </button>
-  </div>
-
-</div><!-- /container -->
+</div><!-- .app -->
 
 <script>
-// Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('Service Worker registered!', reg))
-      .catch(err => console.error('Service Worker registration failed', err));
+(function(){
+'use strict';
+
+// ── State ─────────────────────────────────────────────────────────────────
+const S = {
+  images:   [],   // {img, ox, oy, scale}  per slot
+  needed:   4,
+  template: 'portrait',
+  layout:   'auto',
+  gap:      4,
+  bg:       '#ffffff',
+  fit:      'cover',
+  selected: -1,    // selected cell index
+};
+
+const TEMPLATES = {
+  portrait:  {w:1080, h:1920},
+  landscape: {w:1920, h:1080},
+  square:    {w:1080, h:1080},
+};
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const mainCanvas  = $('mainCanvas');
+const phoneCanvas = $('phoneCanvas');
+const lsCanvas    = $('lsCanvas');
+const ctx  = mainCanvas.getContext('2d');
+const pctx = phoneCanvas.getContext('2d');
+const lctx = lsCanvas.getContext('2d');
+const cellOverlay = $('cellOverlay');
+const stageWrap   = $('stageWrap');
+const emptyState  = $('emptyState');
+const wsScroll    = $('wsScroll');
+const wsInfo      = $('wsInfo');
+const countBadge  = $('countBadge');
+const thumbList   = $('thumbList');
+const dropzone    = $('dropzone');
+const fileInput   = $('fileInput');
+
+// sidebar controls
+const colCount        = $('colCount');
+const fitMode         = $('fitMode');
+const gapSize         = $('gapSize');
+const gapVal          = $('gapVal');
+const bgColor         = $('bgColor');
+const labelText       = $('labelText');
+const fontSize        = $('fontSize');
+const fontColor       = $('fontColor');
+const fontWeight      = $('fontWeight');
+const fontFamily      = $('fontFamily');
+const labelPos        = $('labelPos');
+const labelBg         = $('labelBg');
+const labelBgOpacity  = $('labelBgOpacity');
+const lbgOpVal        = $('lbgOpVal');
+const shadowToggle    = $('shadowToggle');
+const wmEnable        = $('wmEnable');
+const wmText          = $('wmText');
+const wmPos           = $('wmPos');
+const wmFontSize      = $('wmFontSize');
+const wmColor         = $('wmColor');
+const wmOpacity       = $('wmOpacity');
+const wmOpVal         = $('wmOpVal');
+const wmBg            = $('wmBg');
+const wmBgOpacity     = $('wmBgOpacity');
+const wmBgOpVal       = $('wmBgOpVal');
+const wmShadow        = $('wmShadow');
+
+// ── Scale factor: canvas px → screen px ──────────────────────────────────
+let SCALE = 0.4;   // will be recalculated
+
+function calcScale(){
+  const dim = TEMPLATES[S.template];
+  const maxW = wsScroll.clientWidth  - 48;
+  const maxH = wsScroll.clientHeight - 48;
+  SCALE = Math.min(maxW/dim.w, maxH/dim.h, 1);
+}
+
+// ── Layout ────────────────────────────────────────────────────────────────
+function autoGrid(n, tpl){
+  const p = tpl==='portrait';
+  if(n===1) return{cols:1,rows:1};
+  if(n===2) return p?{cols:1,rows:2}:{cols:2,rows:1};
+  if(n===3) return p?{cols:1,rows:3}:{cols:3,rows:1};
+  if(n===4) return{cols:2,rows:2};
+  if(n===5) return p?{cols:2,rows:3}:{cols:3,rows:2};
+  if(n===6) return p?{cols:2,rows:3}:{cols:3,rows:2};
+  if(n===7) return p?{cols:2,rows:4}:{cols:4,rows:2};
+  if(n===8) return p?{cols:2,rows:4}:{cols:4,rows:2};
+  return{cols:3,rows:3};
+}
+function getLayout(){
+  const n=S.needed, m=S.layout, t=S.template;
+  if(m==='row') return{cols:n,rows:1};
+  if(m==='col') return{cols:1,rows:n};
+  if(m==='grid'){const c=n<=4?2:3;return{cols:c,rows:Math.ceil(n/c)};}
+  return autoGrid(n,t);
+}
+function getCells(){
+  const dim=TEMPLATES[S.template];
+  const {cols,rows}=getLayout();
+  const gap=S.gap;
+  const cw=Math.floor((dim.w-(cols+1)*gap)/cols);
+  const ch=Math.floor((dim.h-(rows+1)*gap)/rows);
+  const cells=[];
+  for(let i=0;i<S.needed;i++){
+    const col=i%cols, row=Math.floor(i/cols);
+    cells.push({x:gap+col*(cw+gap), y:gap+row*(ch+gap), w:cw, h:ch, i});
+  }
+  return cells;
+}
+
+// ── Per-image transform ───────────────────────────────────────────────────
+function ensureSlot(i){
+  while(S.images.length<=i) S.images.push(null);
+}
+function getSlot(i){
+  ensureSlot(i);
+  return S.images[i];
+}
+function setSlot(i, data){
+  ensureSlot(i);
+  S.images[i]=data;
+}
+function defaultTransform(img, cw, ch){
+  const fit=S.fit;
+  let scale, ox, oy;
+  if(fit==='cover'){
+    scale=Math.max(cw/img.width, ch/img.height);
+  } else {
+    scale=Math.min(cw/img.width, ch/img.height);
+  }
+  ox=(cw - img.width*scale)/2;
+  oy=(ch - img.height*scale)/2;
+  return{img, ox, oy, scale, baseScale:scale};
+}
+
+// ── Draw helpers ──────────────────────────────────────────────────────────
+function hexToRgba(hex,pct){
+  const n=parseInt(hex.replace('#',''),16);
+  return`rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${pct/100})`;
+}
+
+function drawToCtx(c, W, H){
+  const cells=getCells();
+  c.fillStyle=S.bg;
+  c.fillRect(0,0,W,H);
+
+  cells.forEach(({x,y,w,h,i})=>{
+    const slot=getSlot(i);
+    if(!slot){
+      c.fillStyle='rgba(180,178,174,0.25)';
+      c.fillRect(x,y,w,h);
+      c.fillStyle='rgba(150,148,144,0.5)';
+      c.font=`${Math.min(w,h)*0.12}px sans-serif`;
+      c.textAlign='center';c.textBaseline='middle';
+      c.fillText(`${i+1}`,x+w/2,y+h/2);
+      return;
+    }
+    c.save();
+    c.beginPath();c.rect(x,y,w,h);c.clip();
+    c.fillStyle=S.bg;c.fillRect(x,y,w,h);
+    c.drawImage(slot.img, x+slot.ox, y+slot.oy, slot.img.width*slot.scale, slot.img.height*slot.scale);
+    c.restore();
+  });
+
+  // label
+  const txt=labelText.value.trim();
+  if(txt){
+    const fs=Math.max(12,Math.min(200,parseInt(fontSize.value)||36));
+    const fw=fontWeight.value, ff=fontFamily.value, fc=fontColor.value;
+    const op=Math.max(0,Math.min(100,parseInt(labelBgOpacity.value)||0));
+    const pos=labelPos.value, shadow=shadowToggle.checked;
+    c.font=`${fw} ${fs}px ${ff}`;
+    const VPAD=Math.round(fs*.55), LH=fs+VPAD*2;
+    const ly=pos==='top'?0:pos==='center'?Math.round((H-LH)/2):H-LH;
+    if(op>0){c.fillStyle=hexToRgba(labelBg.value,op);c.fillRect(0,ly,W,LH);}
+    if(shadow){c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=Math.round(fs*.18);c.shadowOffsetY=Math.round(fs*.06);}
+    c.fillStyle=fc;c.textAlign='center';c.textBaseline='middle';
+    c.fillText(txt,W/2,ly+LH/2);
+    c.shadowColor='transparent';c.shadowBlur=0;c.shadowOffsetY=0;
+  }
+
+  // watermark
+  if(wmEnable.checked){
+    const wt=wmText.value.trim();
+    if(wt){
+      const fs=Math.max(10,Math.min(120,parseInt(wmFontSize.value)||28));
+      const wop=Math.max(5,Math.min(100,parseInt(wmOpacity.value)||70));
+      const bgop=Math.max(0,Math.min(100,parseInt(wmBgOpacity.value)||0));
+      const wpos=wmPos.value, wshadow=wmShadow.checked;
+      c.font=`500 ${fs}px sans-serif`;
+      const tw=c.measureText(wt).width;
+      const PAD=Math.round(fs*.5), bW=tw+PAD*2, bH=fs+PAD*1.2;
+      const MG=Math.round(fs*.6);
+      const bx=wpos.endsWith('r')?W-bW-MG:MG;
+      const by=wpos.startsWith('b')?H-bH-MG:MG;
+      if(bgop>0){
+        const bn=parseInt(wmBg.value.replace('#',''),16);
+        c.fillStyle=`rgba(${(bn>>16)&255},${(bn>>8)&255},${bn&255},${bgop/100})`;
+        const rr=Math.round(bH*.3);
+        c.beginPath();
+        c.moveTo(bx+rr,by);c.lineTo(bx+bW-rr,by);c.quadraticCurveTo(bx+bW,by,bx+bW,by+rr);
+        c.lineTo(bx+bW,by+bH-rr);c.quadraticCurveTo(bx+bW,by+bH,bx+bW-rr,by+bH);
+        c.lineTo(bx+rr,by+bH);c.quadraticCurveTo(bx,by+bH,bx,by+bH-rr);
+        c.lineTo(bx,by+rr);c.quadraticCurveTo(bx,by,bx+rr,by);
+        c.closePath();c.fill();
+      }
+      if(wshadow){c.shadowColor='rgba(0,0,0,.55)';c.shadowBlur=Math.round(fs*.2);c.shadowOffsetY=Math.round(fs*.05);}
+      const cn=parseInt(wmColor.value.replace('#',''),16);
+      c.fillStyle=`rgba(${(cn>>16)&255},${(cn>>8)&255},${cn&255},${wop/100})`;
+      c.textAlign='left';c.textBaseline='middle';
+      c.fillText(wt,bx+PAD,by+bH/2);
+      c.shadowColor='transparent';c.shadowBlur=0;c.shadowOffsetY=0;
+    }
+  }
+}
+
+// ── Full render ───────────────────────────────────────────────────────────
+function render(){
+  const dim=TEMPLATES[S.template];
+  const W=dim.w, H=dim.h;
+  mainCanvas.width=W;mainCanvas.height=H;
+  drawToCtx(ctx,W,H);
+
+  // screen size
+  calcScale();
+  const sw=Math.round(W*SCALE), sh=Math.round(H*SCALE);
+  mainCanvas.style.width=sw+'px';mainCanvas.style.height=sh+'px';
+  cellOverlay.style.width=sw+'px';cellOverlay.style.height=sh+'px';
+
+  wsInfo.textContent=`${W}×${H}px · ${TEMPLATES[S.template]===TEMPLATES.portrait?'9:16':S.template==='landscape'?'16:9':'1:1'}`;
+
+  // mini previews
+  if(S.template==='portrait'){
+    phoneCanvas.width=W;phoneCanvas.height=H;
+    drawToCtx(pctx,W,H);
+    phoneCanvas.style.height='auto';
+    $('devPortrait').style.display='';
+    $('devLandscape').style.display='none';
+  } else if(S.template==='landscape'){
+    lsCanvas.width=W;lsCanvas.height=H;
+    drawToCtx(lctx,W,H);
+    lsCanvas.style.width='auto';
+    $('devPortrait').style.display='none';
+    $('devLandscape').style.display='';
+  } else {
+    $('devPortrait').style.display='none';
+    $('devLandscape').style.display='none';
+  }
+
+  buildOverlay();
+}
+
+// ── Cell overlay (interactive handles) ───────────────────────────────────
+function buildOverlay(){
+  cellOverlay.innerHTML='';
+  const cells=getCells();
+  const dim=TEMPLATES[S.template];
+
+  cells.forEach(({x,y,w,h,i})=>{
+    const handle=document.createElement('div');
+    handle.className='cell-handle'+(S.selected===i?' selected':'');
+    handle.style.left  = (x/dim.w*100)+'%';
+    handle.style.top   = (y/dim.h*100)+'%';
+    handle.style.width = (w/dim.w*100)+'%';
+    handle.style.height= (h/dim.h*100)+'%';
+
+    // per-cell floating toolbar
+    const toolbar=document.createElement('div');
+    toolbar.className='cell-toolbar';
+
+    // reset
+    const btnReset=document.createElement('button');
+    btnReset.className='ct-btn';
+    btnReset.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.26"/></svg>重置';
+    btnReset.addEventListener('click',e=>{e.stopPropagation();resetSlot(i);});
+    toolbar.appendChild(btnReset);
+
+    // sep
+    const sep=document.createElement('div');sep.className='ct-sep';toolbar.appendChild(sep);
+
+    // zoom slider
+    const zw=document.createElement('div');zw.className='ct-zoom';
+    const zIcon=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    zIcon.setAttribute('width','11');zIcon.setAttribute('height','11');zIcon.setAttribute('viewBox','0 0 24 24');
+    zIcon.setAttribute('fill','none');zIcon.setAttribute('stroke','currentColor');zIcon.setAttribute('stroke-width','2.2');zIcon.setAttribute('stroke-linecap','round');
+    zIcon.innerHTML='<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>';
+    const slider=document.createElement('input');
+    slider.type='range';slider.min='20';slider.max='300';slider.step='1';
+    const slot=getSlot(i);
+    const pct=slot?Math.round((slot.scale/(slot.baseScale||slot.scale))*100):100;
+    slider.value=pct;
+    slider.addEventListener('input',e=>{
+      e.stopPropagation();
+      const s=getSlot(i);
+      if(!s)return;
+      const ratio=parseInt(slider.value)/100;
+      const cx=s.ox+s.img.width*s.scale/2;
+      const cy=s.oy+s.img.height*s.scale/2;
+      s.scale=s.baseScale*ratio;
+      s.ox=cx-s.img.width*s.scale/2;
+      s.oy=cy-s.img.height*s.scale/2;
+      render();
+    });
+    const zLabel=document.createElement('span');
+    zLabel.style.minWidth='28px';
+    zLabel.textContent=pct+'%';
+    slider.addEventListener('input',()=>{zLabel.textContent=slider.value+'%';});
+    zw.appendChild(zIcon);zw.appendChild(slider);zw.appendChild(zLabel);
+    toolbar.appendChild(zw);
+
+    handle.appendChild(toolbar);
+
+    // click to select
+    handle.addEventListener('mousedown', e=>{
+      if(e.target.closest('.cell-toolbar')) return;
+      S.selected=i;
+      buildOverlay();
+      startDrag(e, i, cells.find(c=>c.i===i));
+    });
+    handle.addEventListener('touchstart',e=>{
+      if(e.target.closest('.cell-toolbar')) return;
+      S.selected=i;
+      buildOverlay();
+      startTouchDrag(e,i,cells.find(c=>c.i===i));
+    },{passive:false});
+
+    // wheel zoom on hover
+    handle.addEventListener('wheel',e=>{
+      e.preventDefault();
+      const s=getSlot(i);
+      if(!s) return;
+      const delta=e.deltaY>0?-0.05:0.05;
+      // zoom toward cursor
+      const rect=handle.getBoundingClientRect();
+      const mx=(e.clientX-rect.left)/rect.width;
+      const my=(e.clientY-rect.top)/rect.height;
+      const cw=cells.find(c=>c.i===i).w;
+      const ch=cells.find(c=>c.i===i).h;
+      const px=mx*cw, py=my*ch;
+      const oldScale=s.scale;
+      s.scale=Math.max(s.baseScale*.2, Math.min(s.baseScale*5, s.scale*(1+delta)));
+      const ratio=s.scale/oldScale;
+      s.ox=px-(px-s.ox)*ratio;
+      s.oy=py-(py-s.oy)*ratio;
+      render();
+    },{passive:false});
+
+    cellOverlay.appendChild(handle);
   });
 }
 
-(function () {
-  'use strict';
+// ── Drag image inside cell ────────────────────────────────────────────────
+function startDrag(e, idx, cell){
+  const slot=getSlot(idx);
+  if(!slot) return;
+  const dim=TEMPLATES[S.template];
+  const sw=mainCanvas.offsetWidth;
+  const sh=mainCanvas.offsetHeight;
+  const startX=e.clientX, startY=e.clientY;
+  const startOx=slot.ox, startOy=slot.oy;
 
-  /* ── state ── */
-  const state = {
-    images: [],
-    needed: 4,
-    template: 'portrait'   // 'portrait' | 'landscape' | 'square'
+  function onMove(ev){
+    const dx=(ev.clientX-startX)/(sw/dim.w);
+    const dy=(ev.clientY-startY)/(sh/dim.h);
+    slot.ox=startOx+dx;
+    slot.oy=startOy+dy;
+    render();
+  }
+  function onUp(){
+    window.removeEventListener('mousemove',onMove);
+    window.removeEventListener('mouseup',onUp);
+  }
+  window.addEventListener('mousemove',onMove);
+  window.addEventListener('mouseup',onUp);
+}
+function startTouchDrag(e, idx, cell){
+  e.preventDefault();
+  const slot=getSlot(idx);
+  if(!slot) return;
+  const dim=TEMPLATES[S.template];
+  const sw=mainCanvas.offsetWidth, sh=mainCanvas.offsetHeight;
+  const t0=e.touches[0];
+  const startX=t0.clientX, startY=t0.clientY;
+  const startOx=slot.ox, startOy=slot.oy;
+  function onMove(ev){
+    const t=ev.touches[0];
+    const dx=(t.clientX-startX)/(sw/dim.w);
+    const dy=(t.clientY-startY)/(sh/dim.h);
+    slot.ox=startOx+dx; slot.oy=startOy+dy;
+    render();
+  }
+  function onEnd(){
+    window.removeEventListener('touchmove',onMove);
+    window.removeEventListener('touchend',onEnd);
+  }
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('touchend',onEnd);
+}
+
+function resetSlot(i){
+  const slot=getSlot(i);
+  const cells=getCells();
+  const cell=cells.find(c=>c.i===i);
+  if(!slot||!cell) return;
+  const t=defaultTransform(slot.img,cell.w,cell.h);
+  slot.ox=t.ox; slot.oy=t.oy; slot.scale=t.scale; slot.baseScale=t.baseScale;
+  render();
+}
+
+// ── Click outside deselect ────────────────────────────────────────────────
+wsScroll.addEventListener('mousedown',e=>{
+  if(!e.target.closest('.cell-handle')){S.selected=-1;buildOverlay();}
+});
+
+// ── Template switching ────────────────────────────────────────────────────
+document.querySelectorAll('.tpl-chip').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    S.template=btn.dataset.tpl;
+    document.querySelectorAll('.tpl-chip').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    // re-apply transforms for new cell sizes
+    reapplyTransforms();
+    render();
+  });
+});
+
+// ── Layout chips ──────────────────────────────────────────────────────────
+document.querySelectorAll('#layoutChips .chip').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    S.layout=btn.dataset.layout;
+    document.querySelectorAll('#layoutChips .chip').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    reapplyTransforms();
+    render();
+  });
+});
+
+function reapplyTransforms(){
+  const cells=getCells();
+  cells.forEach(({w,h,i})=>{
+    const slot=getSlot(i);
+    if(!slot) return;
+    const t=defaultTransform(slot.img,w,h);
+    slot.ox=t.ox; slot.oy=t.oy; slot.scale=t.scale; slot.baseScale=t.baseScale;
+  });
+}
+
+// ── Sidebar collapsible sections ─────────────────────────────────────────
+document.querySelectorAll('.sec-head').forEach(head=>{
+  head.addEventListener('click',()=>{
+    const key=head.dataset.sec;
+    const body=$('sec-'+key);
+    const caret=head.querySelector('.sec-caret');
+    const isOpen=body.classList.contains('open');
+    body.classList.toggle('open',!isOpen);
+    caret.classList.toggle('open',!isOpen);
+    head.classList.toggle('open',!isOpen);
+  });
+});
+
+// ── Sliders ───────────────────────────────────────────────────────────────
+gapSize.addEventListener('input',()=>{
+  S.gap=parseInt(gapSize.value)||0;
+  gapVal.textContent=S.gap+'px';
+  reapplyTransforms(); render();
+});
+labelBgOpacity.addEventListener('input',()=>{lbgOpVal.textContent=labelBgOpacity.value+'%';render();});
+wmOpacity.addEventListener('input',()=>{wmOpVal.textContent=wmOpacity.value+'%';render();});
+wmBgOpacity.addEventListener('input',()=>{wmBgOpVal.textContent=wmBgOpacity.value+'%';render();});
+
+// ── All other re-render inputs ────────────────────────────────────────────
+[bgColor,fitMode,labelText,fontSize,fontColor,fontWeight,fontFamily,labelPos,labelBg,
+ shadowToggle,wmEnable,wmText,wmPos,wmFontSize,wmColor,wmShadow].forEach(el=>{
+  el.addEventListener('change',()=>{
+    if(el===fitMode){S.fit=el.value;reapplyTransforms();}
+    render();
+  });
+  el.addEventListener('input',render);
+});
+
+colCount.addEventListener('change',()=>{
+  const prev=S.needed;
+  S.needed=parseInt(colCount.value);
+  if(S.needed<prev) S.images=S.images.slice(0,S.needed);
+  updateBadge(); buildThumbs(); reapplyTransforms(); render();
+});
+
+// ── File loading ──────────────────────────────────────────────────────────
+function loadFiles(files){
+  const remaining=S.needed-S.images.filter(Boolean).length;
+  // find first empty slots
+  const empties=[];
+  for(let i=0;i<S.needed;i++){ if(!getSlot(i)) empties.push(i); }
+  const toLoad=Array.from(files).slice(0,empties.length);
+  let done=0;
+  toLoad.forEach((f,fi)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const idx=empties[fi];
+      const cells=getCells();
+      const cell=cells.find(c=>c.i===idx)||{w:400,h:400};
+      setSlot(idx, defaultTransform(img,cell.w,cell.h));
+      done++;
+      if(done===toLoad.length){
+        updateBadge(); buildThumbs();
+        showStage(); render();
+      }
+    };
+    img.onerror=()=>{done++;if(done===toLoad.length){updateBadge();buildThumbs();render();}};
+    img.src=URL.createObjectURL(f);
+  });
+}
+
+function showStage(){
+  emptyState.style.display='none';
+  stageWrap.style.display='inline-block';
+}
+
+function updateBadge(){
+  const got=S.images.filter(Boolean).length;
+  countBadge.textContent=`${got}/${S.needed}`;
+}
+
+function buildThumbs(){
+  thumbList.innerHTML='';
+  for(let i=0;i<S.needed;i++){
+    const slot=getSlot(i);
+    if(!slot) continue;
+    const wrap=document.createElement('div');wrap.className='thumb';
+    const img=document.createElement('img');img.src=slot.img.src;wrap.appendChild(img);
+    const num=document.createElement('span');num.className='thumb-n';num.textContent=i+1;wrap.appendChild(num);
+    const del=document.createElement('button');del.className='del';del.textContent='×';
+    del.addEventListener('click',e=>{
+      e.stopPropagation();
+      S.images[i]=null;
+      if(S.selected===i) S.selected=-1;
+      updateBadge(); buildThumbs(); render();
+      const anyImg=S.images.some(Boolean);
+      if(!anyImg){emptyState.style.display='';stageWrap.style.display='none';}
+    });
+    wrap.appendChild(del);
+    thumbList.appendChild(wrap);
+  }
+}
+
+fileInput.addEventListener('change',e=>loadFiles(e.target.files));
+dropzone.addEventListener('click',()=>fileInput.click());
+dropzone.addEventListener('dragover',e=>{e.preventDefault();dropzone.classList.add('over');});
+dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('over'));
+dropzone.addEventListener('drop',e=>{e.preventDefault();dropzone.classList.remove('over');loadFiles(e.dataTransfer.files);});
+
+// ── Export panel ──────────────────────────────────────────────────────────
+const exportMenu   = $('exportMenu');
+const exportScale  = $('exportScale');
+const exportFormat = $('exportFormat');
+const exportQuality= $('exportQuality');
+const qualityVal   = $('qualityVal');
+const qualityField = $('qualityField');
+const exportSizeHint=$('exportSizeHint');
+const doExportBtn  = $('doExportBtn');
+
+$('downloadBtn').addEventListener('click', e=>{
+  e.stopPropagation();
+  exportMenu.style.display = exportMenu.style.display==='none' ? 'block' : 'none';
+  updateExportHint();
+});
+document.addEventListener('click', e=>{
+  if(!$('exportWrap').contains(e.target)) exportMenu.style.display='none';
+});
+
+function updateExportHint(){
+  const dim = TEMPLATES[S.template];
+  const sc  = parseInt(exportScale.value)||2;
+  const W   = dim.w * sc, H = dim.h * sc;
+  exportSizeHint.textContent = `输出尺寸：${W.toLocaleString()} × ${H.toLocaleString()} px（${sc}× 倍率）\n基于原图实际像素重新绘制，不损失清晰度`;
+}
+exportScale.addEventListener('change', updateExportHint);
+exportFormat.addEventListener('change',()=>{
+  const fmt = exportFormat.value;
+  qualityField.style.display = fmt==='png' ? 'none' : '';
+  updateExportHint();
+});
+exportQuality.addEventListener('input',()=>{
+  qualityVal.textContent = exportQuality.value+'%';
+});
+updateExportHint();
+
+// ── High-resolution export ────────────────────────────────────────────────
+// Key insight: draw onto a fresh offscreen canvas scaled by `exportScale`.
+// Each image slot's transform (ox, oy, scale) was computed in "template px"
+// space (e.g. 1080×1920). We multiply everything by `sc` so the images are
+// sampled at full source resolution — no upscaling blur.
+function exportHighRes(){
+  if(!S.images.some(Boolean)) return;
+
+  const dim = TEMPLATES[S.template];
+  const sc  = parseInt(exportScale.value)||2;
+  const W   = dim.w * sc;
+  const H   = dim.h * sc;
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width  = W;
+  offscreen.height = H;
+  const oc = offscreen.getContext('2d');
+
+  // Enable high-quality image smoothing
+  oc.imageSmoothingEnabled = true;
+  oc.imageSmoothingQuality = 'high';
+
+  // Background
+  oc.fillStyle = S.bg;
+  oc.fillRect(0, 0, W, H);
+
+  // Cells — scale all coordinates by sc
+  const cells = getCells();
+  cells.forEach(({x, y, w, h, i})=>{
+    const sx=x*sc, sy=y*sc, sw=w*sc, sh=h*sc;
+    const slot = getSlot(i);
+    if(!slot){
+      oc.fillStyle='rgba(180,178,174,0.25)';
+      oc.fillRect(sx,sy,sw,sh);
+      return;
+    }
+    oc.save();
+    oc.beginPath(); oc.rect(sx,sy,sw,sh); oc.clip();
+    oc.fillStyle=S.bg; oc.fillRect(sx,sy,sw,sh);
+    // slot.ox / slot.oy / slot.scale are in template-px space; multiply by sc
+    oc.drawImage(
+      slot.img,
+      sx + slot.ox * sc,
+      sy + slot.oy * sc,
+      slot.img.width  * slot.scale * sc,
+      slot.img.height * slot.scale * sc
+    );
+    oc.restore();
+  });
+
+  // Label — scale font size and positions by sc
+  const txt = labelText.value.trim();
+  if(txt){
+    const fs  = Math.max(12,Math.min(200,parseInt(fontSize.value)||36)) * sc;
+    const fw  = fontWeight.value, ff=fontFamily.value, fc=fontColor.value;
+    const op  = Math.max(0,Math.min(100,parseInt(labelBgOpacity.value)||0));
+    const pos = labelPos.value, shadow=shadowToggle.checked;
+    oc.font = `${fw} ${fs}px ${ff}`;
+    const VPAD=Math.round(fs*.55), LH=fs+VPAD*2;
+    const ly = pos==='top'?0:pos==='center'?Math.round((H-LH)/2):H-LH;
+    if(op>0){oc.fillStyle=hexToRgba(labelBg.value,op);oc.fillRect(0,ly,W,LH);}
+    if(shadow){oc.shadowColor='rgba(0,0,0,.6)';oc.shadowBlur=Math.round(fs*.18);oc.shadowOffsetY=Math.round(fs*.06);}
+    oc.fillStyle=fc; oc.textAlign='center'; oc.textBaseline='middle';
+    oc.fillText(txt, W/2, ly+LH/2);
+    oc.shadowColor='transparent'; oc.shadowBlur=0; oc.shadowOffsetY=0;
+  }
+
+  // Watermark — scale by sc
+  if(wmEnable.checked){
+    const wt=wmText.value.trim();
+    if(wt){
+      const fs  = Math.max(10,Math.min(120,parseInt(wmFontSize.value)||28)) * sc;
+      const wop = Math.max(5,Math.min(100,parseInt(wmOpacity.value)||70));
+      const bgop= Math.max(0,Math.min(100,parseInt(wmBgOpacity.value)||0));
+      const wpos=wmPos.value, wshadow=wmShadow.checked;
+      oc.font=`500 ${fs}px sans-serif`;
+      const tw=oc.measureText(wt).width;
+      const PAD=Math.round(fs*.5), bW=tw+PAD*2, bH=fs+PAD*1.2;
+      const MG=Math.round(fs*.6);
+      const bx=wpos.endsWith('r')?W-bW-MG:MG;
+      const by=wpos.startsWith('b')?H-bH-MG:MG;
+      if(bgop>0){
+        const bn=parseInt(wmBg.value.replace('#',''),16);
+        oc.fillStyle=`rgba(${(bn>>16)&255},${(bn>>8)&255},${bn&255},${bgop/100})`;
+        const rr=Math.round(bH*.3);
+        oc.beginPath();
+        oc.moveTo(bx+rr,by);oc.lineTo(bx+bW-rr,by);oc.quadraticCurveTo(bx+bW,by,bx+bW,by+rr);
+        oc.lineTo(bx+bW,by+bH-rr);oc.quadraticCurveTo(bx+bW,by+bH,bx+bW-rr,by+bH);
+        oc.lineTo(bx+rr,by+bH);oc.quadraticCurveTo(bx,by+bH,bx,by+bH-rr);
+        oc.lineTo(bx,by+rr);oc.quadraticCurveTo(bx,by,bx+rr,by);
+        oc.closePath(); oc.fill();
+      }
+      if(wshadow){oc.shadowColor='rgba(0,0,0,.55)';oc.shadowBlur=Math.round(fs*.2);oc.shadowOffsetY=Math.round(fs*.05);}
+      const cn=parseInt(wmColor.value.replace('#',''),16);
+      oc.fillStyle=`rgba(${(cn>>16)&255},${(cn>>8)&255},${cn&255},${wop/100})`;
+      oc.textAlign='left'; oc.textBaseline='middle';
+      oc.fillText(wt, bx+PAD, by+bH/2);
+      oc.shadowColor='transparent'; oc.shadowBlur=0; oc.shadowOffsetY=0;
+    }
+  }
+
+  // Export
+  const fmt = exportFormat.value;
+  const mime = fmt==='jpg'?'image/jpeg':fmt==='webp'?'image/webp':'image/png';
+  const quality = parseInt(exportQuality.value)/100;
+  const ext = fmt==='jpg'?'jpg':fmt==='webp'?'webp':'png';
+
+  doExportBtn.textContent='生成中…';
+  doExportBtn.disabled=true;
+
+  // Use setTimeout to let the UI update before heavy canvas work
+  setTimeout(()=>{
+    const dataURL = fmt==='png'
+      ? offscreen.toDataURL('image/png')
+      : offscreen.toDataURL(mime, quality);
+
+    const a=document.createElement('a');
+    a.download=`拼图_${S.template}_${sc}x_${Date.now()}.${ext}`;
+    a.href=dataURL;
+    a.click();
+
+    doExportBtn.innerHTML=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>开始导出`;
+    doExportBtn.disabled=false;
+    exportMenu.style.display='none';
+  }, 30);
+}
+
+doExportBtn.addEventListener('click', exportHighRes);
+
+// ── Resize handler ────────────────────────────────────────────────────────
+let resizeTimer;
+window.addEventListener('resize',()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(render,100);
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+S.gap=parseInt(gapSize.value)||4;
+S.fit=fitMode.value;
+updateBadge();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ANNOTATION ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+(function(){
+  const annoCanvas = $('annoCanvas');
+  const actx = annoCanvas.getContext('2d');
+  const textProxy = $('textInputProxy');
+
+  // ── Annotation state ────────────────────────────────────────────────────
+  const A = {
+    tool: 'select',    // select | draw | arrow | rect | text | erase
+    color: '#e85d3a',
+    size: 4,
+    fontSize: 32,
+    objects: [],       // committed objects
+    history: [],       // undo stack (snapshots of objects array)
+    selectedIdx: -1,
+    dragging: false,
+    dragObj: null,
+    dragOffX: 0, dragOffY: 0,
+    // current stroke being drawn (preview)
+    drawing: false,
+    pts: [],           // {x,y} in canvas-px space
+    startX: 0, startY: 0,
   };
 
-  /* canvas dimensions per template */
-  const TEMPLATES = {
-    portrait:  { w: 1080, h: 1920, label: '竖屏 9:16' },
-    landscape: { w: 1920, h: 1080, label: '横屏 16:9' },
-    square:    { w: 1080, h: 1080, label: '方形 1:1'  }
-  };
+  // Object types: {type:'stroke', pts, color, size}
+  //               {type:'arrow',  x1,y1,x2,y2, color, size}
+  //               {type:'rect',   x,y,w,h, color, size}
+  //               {type:'text',   x,y, text, color, fontSize}
 
-  /* ── refs ── */
-  const $ = id => document.getElementById(id);
-  const colCount       = $('colCount');
-  const layoutMode     = $('layoutMode');
-  const gapSize        = $('gapSize');
-  const bgColor        = $('bgColor');
-  const fitMode        = $('fitMode');
-  const labelText      = $('labelText');
-  const fontSize       = $('fontSize');
-  const fontColor      = $('fontColor');
-  const fontFamily     = $('fontFamily');
-  const fontWeight     = $('fontWeight');
-  const labelPos       = $('labelPos');
-  const labelBg        = $('labelBg');
-  const labelBgOpacity = $('labelBgOpacity');
-  const shadowToggle   = $('shadowToggle');
-  const fileInput      = $('fileInput');
-  const dropzone       = $('dropzone');
-  const mainCanvas     = $('mainCanvas');
-  const ctx            = mainCanvas.getContext('2d');
-  const phoneCanvas    = $('phoneCanvas');
-  const pctx           = phoneCanvas.getContext('2d');
-  const lsCanvas       = $('landscapeCanvas');
-  const lctx           = lsCanvas.getContext('2d');
-  const emptyHint      = $('emptyHint');
-  const countBadge     = $('countBadge');
-  const thumbStrip     = $('thumbStrip');
-  const phoneShell     = $('phoneShell');
-  const landscapeShell = $('landscapeShell');
-
-  /* ── helpers ── */
-  function hexToRgba(hex, pct) {
-    const n = parseInt(hex.replace('#',''), 16);
-    return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${pct/100})`;
+  // ── Sync anno canvas size to main canvas ────────────────────────────────
+  function syncSize(){
+    const mc = mainCanvas;
+    annoCanvas.width  = mc.offsetWidth  || mc.width;
+    annoCanvas.height = mc.offsetHeight || mc.height;
+    annoCanvas.style.width  = mc.style.width  || mc.width+'px';
+    annoCanvas.style.height = mc.style.height || mc.height+'px';
+    redrawAnno();
   }
 
-  /* smart grid for a given orientation */
-  function autoGrid(n, tpl) {
-    const portrait = tpl === 'portrait';
-    if (n === 1) return { cols:1, rows:1 };
-    if (n === 2) return portrait ? { cols:1, rows:2 } : { cols:2, rows:1 };
-    if (n === 3) return portrait ? { cols:1, rows:3 } : { cols:3, rows:1 };
-    if (n === 4) return { cols:2, rows:2 };
-    if (n === 5) return portrait ? { cols:2, rows:3 } : { cols:3, rows:2 }; // 5 cells in 2x3 or 3x2
-    if (n === 6) return portrait ? { cols:2, rows:3 } : { cols:3, rows:2 };
-    if (n === 7) return portrait ? { cols:2, rows:4 } : { cols:4, rows:2 };
-    if (n === 8) return portrait ? { cols:2, rows:4 } : { cols:4, rows:2 };
-    if (n === 9) return { cols:3, rows:3 };
-    return { cols:3, rows: Math.ceil(n/3) };
+  // Called after each render() so anno canvas tracks main canvas size
+  const origRender = render;
+  window._annoSyncHook = syncSize;
+
+  // ── Coordinate conversion: screen-px → canvas-px ────────────────────────
+  function toCanvasPx(ex, ey){
+    const rect = annoCanvas.getBoundingClientRect();
+    const scaleX = annoCanvas.width  / rect.width;
+    const scaleY = annoCanvas.height / rect.height;
+    return { x:(ex-rect.left)*scaleX, y:(ey-rect.top)*scaleY };
   }
 
-  function getLayout(n, mode, tpl) {
-    if (mode === 'row') return { cols:n, rows:1 };
-    if (mode === 'col') return { cols:1, rows:n };
-    if (mode === 'grid') {
-      const cols = n<=2?2 : n<=4?2 : 3;
-      return { cols, rows: Math.ceil(n/cols) };
-    }
-    return autoGrid(n, tpl);
+  // ── Redraw all annotations ───────────────────────────────────────────────
+  function redrawAnno(){
+    actx.clearRect(0,0,annoCanvas.width,annoCanvas.height);
+    A.objects.forEach((obj,i)=>{
+      drawObj(actx, obj, i===A.selectedIdx);
+    });
   }
 
-  function drawFit(c, img, x, y, w, h, mode) {
-    if (mode === 'cover') {
-      const scale = Math.max(w/img.width, h/img.height);
-      const sw = img.width*scale, sh = img.height*scale;
-      c.drawImage(img, x+(w-sw)/2, y+(h-sh)/2, sw, sh);
-    } else {
-      const scale = Math.min(w/img.width, h/img.height);
-      const sw = img.width*scale, sh = img.height*scale;
-      c.drawImage(img, x+(w-sw)/2, y+(h-sh)/2, sw, sh);
-    }
-  }
-
-  function drawLabel(c, W, H) {
-    const text = labelText.value.trim();
-    if (!text) return;
-    const fs  = Math.max(12, Math.min(200, parseInt(fontSize.value)||36));
-    const fc  = fontColor.value;
-    const ff  = fontFamily.value;
-    const fw  = fontWeight.value;
-    const op  = Math.max(0, Math.min(100, parseInt(labelBgOpacity.value)||0));
-    const lbg = hexToRgba(labelBg.value, op);
-    const pos = labelPos.value;
-    const shadow = shadowToggle.value === '1';
-    c.font = `${fw} ${fs}px ${ff}`;
-    const VPAD = Math.round(fs*0.55);
-    const LH   = fs + VPAD*2;
-    let ly = pos==='top' ? 0 : pos==='center' ? Math.round((H-LH)/2) : H-LH;
-    if (op > 0) { c.fillStyle = lbg; c.fillRect(0, ly, W, LH); }
-    if (shadow) {
-      c.shadowColor = 'rgba(0,0,0,0.6)';
-      c.shadowBlur  = Math.round(fs*0.18);
-      c.shadowOffsetX = 0; c.shadowOffsetY = Math.round(fs*0.06);
-    }
-    c.fillStyle = fc; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillText(text, W/2, ly+LH/2);
-    c.shadowColor='transparent'; c.shadowBlur=0; c.shadowOffsetX=0; c.shadowOffsetY=0;
-  }
-
-  function drawWatermark(c, W, H) {
-    if ($('wmEnable').value !== '1') return;
-    const text = $('wmText').value.trim();
-    if (!text) return;
-
-    const fs      = Math.max(10, Math.min(120, parseInt($('wmFontSize').value) || 28));
-    const color   = $('wmColor').value;
-    const opacity = Math.max(5, Math.min(100, parseInt($('wmOpacity').value) || 70)) / 100;
-    const bgHex   = $('wmBg').value;
-    const bgOp    = Math.max(0, Math.min(100, parseInt($('wmBgOpacity').value) || 0));
-    const shadow  = $('wmShadow').value === '1';
-    const pos     = $('wmPos').value;
-
+  function drawObj(c, obj, selected){
     c.save();
-    c.font = `500 ${fs}px sans-serif`;
-    const tw   = c.measureText(text).width;
-    const PAD  = Math.round(fs * 0.5);
-    const boxW = tw + PAD * 2;
-    const boxH = fs + PAD * 1.2;
-    const MARGIN = Math.round(fs * 0.6);
+    c.strokeStyle = obj.color;
+    c.fillStyle   = obj.color;
+    c.lineWidth   = obj.size || 4;
+    c.lineCap     = 'round';
+    c.lineJoin    = 'round';
 
-    let bx = pos.endsWith('r') ? W - boxW - MARGIN : MARGIN;
-    let by = pos.startsWith('b') ? H - boxH - MARGIN : MARGIN;
-
-    /* background pill */
-    if (bgOp > 0) {
-      const n = parseInt(bgHex.replace('#',''), 16);
-      c.fillStyle = `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${bgOp/100})`;
-      const r = Math.round(boxH * 0.3);
+    if(obj.type==='stroke'){
+      if(obj.pts.length<2){c.restore();return;}
       c.beginPath();
-      c.moveTo(bx+r, by);
-      c.lineTo(bx+boxW-r, by);
-      c.quadraticCurveTo(bx+boxW, by, bx+boxW, by+r);
-      c.lineTo(bx+boxW, by+boxH-r);
-      c.quadraticCurveTo(bx+boxW, by+boxH, bx+boxW-r, by+boxH);
-      c.lineTo(bx+r, by+boxH);
-      c.quadraticCurveTo(bx, by+boxH, bx, by+boxH-r);
-      c.lineTo(bx, by+r);
-      c.quadraticCurveTo(bx, by, bx+r, by);
-      c.closePath();
-      c.fill();
+      c.moveTo(obj.pts[0].x, obj.pts[0].y);
+      for(let i=1;i<obj.pts.length;i++) c.lineTo(obj.pts[i].x, obj.pts[i].y);
+      c.stroke();
+    }
+    else if(obj.type==='arrow'){
+      const {x1,y1,x2,y2} = obj;
+      const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+      if(len<2){c.restore();return;}
+      c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+      // arrowhead
+      const hs=Math.min(obj.size*4+8, len*0.4);
+      const angle=Math.atan2(dy,dx);
+      c.beginPath();
+      c.moveTo(x2, y2);
+      c.lineTo(x2-hs*Math.cos(angle-0.4), y2-hs*Math.sin(angle-0.4));
+      c.lineTo(x2-hs*Math.cos(angle+0.4), y2-hs*Math.sin(angle+0.4));
+      c.closePath(); c.fill();
+    }
+    else if(obj.type==='rect'){
+      c.strokeRect(obj.x, obj.y, obj.w, obj.h);
+      if(selected){
+        c.save();c.strokeStyle='rgba(255,255,255,.7)';c.lineWidth=1;c.setLineDash([4,3]);
+        c.strokeRect(obj.x, obj.y, obj.w, obj.h);c.restore();
+      }
+    }
+    else if(obj.type==='text'){
+      c.font = `600 ${obj.fontSize}px sans-serif`;
+      c.textBaseline = 'top';
+      // shadow for readability
+      c.shadowColor='rgba(0,0,0,.45)'; c.shadowBlur=4; c.shadowOffsetY=1;
+      c.fillText(obj.text, obj.x, obj.y);
+      c.shadowColor='transparent'; c.shadowBlur=0; c.shadowOffsetY=0;
     }
 
-    /* shadow */
-    if (shadow) {
-      c.shadowColor   = 'rgba(0,0,0,0.55)';
-      c.shadowBlur    = Math.round(fs * 0.2);
-      c.shadowOffsetX = 0;
-      c.shadowOffsetY = Math.round(fs * 0.05);
+    // selection ring
+    if(selected){
+      const bb = getBBox(obj);
+      if(bb){
+        c.save();
+        c.strokeStyle='var(--accent,#e85d3a)'; // fallback
+        // compute CSS var dynamically
+        c.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#e85d3a';
+        c.lineWidth=2; c.setLineDash([5,3]);
+        c.strokeRect(bb.x-4, bb.y-4, bb.w+8, bb.h+8);
+        c.restore();
+      }
     }
-
-    /* text */
-    const n = parseInt(color.replace('#',''), 16);
-    c.fillStyle    = `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${opacity})`;
-    c.textAlign    = 'left';
-    c.textBaseline = 'middle';
-    c.fillText(text, bx + PAD, by + boxH / 2);
-
-    c.shadowColor='transparent'; c.shadowBlur=0; c.shadowOffsetX=0; c.shadowOffsetY=0;
     c.restore();
   }
 
-  /* ── core render ── */
-  function renderToCanvas(targetCanvas, targetCtx) {
-    const n    = state.needed;
-    const imgs = state.images.slice(0, n);
-    const tpl  = state.template;
-    const dim  = TEMPLATES[tpl];
-
-    const gap  = parseInt(gapSize.value) || 0;
-    const bg   = bgColor.value;
-    const fit  = fitMode.value;
-    const { cols, rows } = getLayout(n, layoutMode.value, tpl);
-
-    const W = dim.w, H = dim.h;
-    targetCanvas.width  = W;
-    targetCanvas.height = H;
-
-    targetCtx.fillStyle = bg;
-    targetCtx.fillRect(0, 0, W, H);
-
-    if (imgs.length === 0) return;
-
-    /* cell sizes — non-uniform last row support */
-    const totalGapX = (cols+1)*gap;
-    const totalGapY = (rows+1)*gap;
-    const cellW = Math.floor((W - totalGapX) / cols);
-    const cellH = Math.floor((H - totalGapY) / rows);
-
-    imgs.forEach((img, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const x   = gap + col*(cellW+gap);
-      const y   = gap + row*(cellH+gap);
-      targetCtx.fillStyle = bg;
-      targetCtx.fillRect(x, y, cellW, cellH);
-      targetCtx.save();
-      targetCtx.beginPath();
-      targetCtx.rect(x, y, cellW, cellH);
-      targetCtx.clip();
-      drawFit(targetCtx, img, x, y, cellW, cellH, fit);
-      targetCtx.restore();
-    });
-
-    drawLabel(targetCtx, W, H);
-    drawWatermark(targetCtx, W, H);
+  function getBBox(obj){
+    if(obj.type==='stroke'){
+      if(!obj.pts.length) return null;
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      obj.pts.forEach(p=>{minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);});
+      const pad=obj.size/2;
+      return{x:minX-pad,y:minY-pad,w:maxX-minX+obj.size,h:maxY-minY+obj.size};
+    }
+    if(obj.type==='arrow'){
+      const minX=Math.min(obj.x1,obj.x2), minY=Math.min(obj.y1,obj.y2);
+      const maxX=Math.max(obj.x1,obj.x2), maxY=Math.max(obj.y1,obj.y2);
+      return{x:minX,y:minY,w:maxX-minX||20,h:maxY-minY||20};
+    }
+    if(obj.type==='rect') return{x:obj.x,y:obj.y,w:obj.w,h:obj.h};
+    if(obj.type==='text'){
+      actx.font=`600 ${obj.fontSize}px sans-serif`;
+      const tw=actx.measureText(obj.text).width;
+      return{x:obj.x,y:obj.y,w:tw,h:obj.fontSize*1.3};
+    }
+    return null;
   }
 
-  function render() {
-    const n = state.needed;
-    const imgs = state.images.slice(0, n);
-    const tpl = state.template;
+  function hitTest(obj, px, py){
+    const bb=getBBox(obj);
+    if(!bb) return false;
+    return px>=bb.x&&px<=bb.x+bb.w&&py>=bb.y&&py<=bb.y+bb.h;
+  }
 
-    if (imgs.length === 0) {
-      mainCanvas.style.display = 'none';
-      emptyHint.style.display  = '';
-      phoneCanvas.style.display    = 'none';
-      lsCanvas.style.display       = 'none';
+  // ── Save history snapshot ────────────────────────────────────────────────
+  function pushHistory(){
+    A.history.push(JSON.stringify(A.objects));
+    if(A.history.length>40) A.history.shift();
+    $('undoBtn').disabled = A.history.length===0;
+  }
+
+  function undo(){
+    if(!A.history.length) return;
+    A.objects = JSON.parse(A.history.pop());
+    // restore img refs for strokes (they are plain pts, no img refs)
+    A.selectedIdx = -1;
+    redrawAnno();
+    $('undoBtn').disabled = A.history.length===0;
+  }
+
+  // ── Tool switching ───────────────────────────────────────────────────────
+  function setTool(t){
+    A.tool = t;
+    commitText();
+    ['select','draw','arrow','rect','text','erase'].forEach(n=>{
+      $('tool'+n.charAt(0).toUpperCase()+n.slice(1)).classList.toggle('active', n===t);
+    });
+    annoCanvas.className = 'tool-'+t;
+    A.selectedIdx = -1;
+    redrawAnno();
+  }
+
+  $('toolSelect').addEventListener('click',()=>setTool('select'));
+  $('toolDraw').addEventListener('click',()=>setTool('draw'));
+  $('toolArrow').addEventListener('click',()=>setTool('arrow'));
+  $('toolRect').addEventListener('click',()=>setTool('rect'));
+  $('toolText').addEventListener('click',()=>setTool('text'));
+  $('toolErase').addEventListener('click',()=>setTool('erase'));
+
+  const annoColor   = $('annoColor');
+  const annoSize    = $('annoSize');
+  const annoSizeVal = $('annoSizeVal');
+  const annoFontSize= $('annoFontSize');
+  const annoFontSizeVal=$('annoFontSizeVal');
+
+  annoColor.addEventListener('input',()=>{ A.color=annoColor.value; });
+  annoSize.addEventListener('input',()=>{ A.size=parseInt(annoSize.value); annoSizeVal.textContent=A.size; });
+  annoFontSize.addEventListener('input',()=>{ A.fontSize=parseInt(annoFontSize.value); annoFontSizeVal.textContent=A.fontSize; });
+
+  $('undoBtn').addEventListener('click', undo);
+  $('clearAnnoBtn').addEventListener('click',()=>{
+    if(!A.objects.length) return;
+    pushHistory();
+    A.objects=[];
+    A.selectedIdx=-1;
+    redrawAnno();
+  });
+
+  document.addEventListener('keydown', e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==='z'){ e.preventDefault(); undo(); }
+    if(e.key==='Escape'){commitText();A.selectedIdx=-1;redrawAnno();}
+    if((e.key==='Delete'||e.key==='Backspace')&&A.selectedIdx>=0&&document.activeElement!==textProxy){
+      e.preventDefault();
+      pushHistory();
+      A.objects.splice(A.selectedIdx,1);
+      A.selectedIdx=-1;
+      redrawAnno();
+    }
+  });
+
+  // ── Text input proxy ─────────────────────────────────────────────────────
+  let textPending = null; // {x,y} in anno-canvas px
+
+  function openTextInput(cx, cy){
+    const rect = annoCanvas.getBoundingClientRect();
+    const sx = cx / annoCanvas.width  * rect.width  + rect.left;
+    const sy = cy / annoCanvas.height * rect.height + rect.top;
+    const wrapRect = stageWrap.getBoundingClientRect();
+    textProxy.style.left   = (sx - wrapRect.left)+'px';
+    textProxy.style.top    = (sy - wrapRect.top)+'px';
+    textProxy.style.fontSize= A.fontSize*(rect.width/annoCanvas.width)+'px';
+    textProxy.style.color   = A.color;
+    textProxy.style.display = 'block';
+    textProxy.value = '';
+    textProxy.focus();
+    // auto resize
+    textProxy.style.height = 'auto';
+    textPending = {x:cx, y:cy};
+  }
+
+  function commitText(){
+    if(textProxy.style.display==='none') return;
+    const txt = textProxy.value.trim();
+    if(txt && textPending){
+      pushHistory();
+      A.objects.push({type:'text', x:textPending.x, y:textPending.y,
+        text:txt, color:A.color, fontSize:A.fontSize});
+      redrawAnno();
+    }
+    textProxy.style.display='none';
+    textProxy.value='';
+    textPending=null;
+  }
+
+  textProxy.addEventListener('input',()=>{
+    textProxy.style.height='auto';
+    textProxy.style.height=textProxy.scrollHeight+'px';
+  });
+  textProxy.addEventListener('keydown', e=>{
+    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); commitText(); }
+    if(e.key==='Escape'){ textProxy.style.display='none'; textProxy.value=''; textPending=null; }
+  });
+  textProxy.addEventListener('blur',()=>{ setTimeout(commitText, 100); });
+
+  // ── Pointer helpers ───────────────────────────────────────────────────────
+  function getEvtPos(e){
+    const t = e.touches ? e.touches[0] : e;
+    return toCanvasPx(t.clientX, t.clientY);
+  }
+
+  // ── Pointer down ─────────────────────────────────────────────────────────
+  annoCanvas.addEventListener('pointerdown', e=>{
+    if(e.button!==undefined && e.button!==0) return;
+    annoCanvas.setPointerCapture(e.pointerId);
+    const {x,y} = toCanvasPx(e.clientX, e.clientY);
+
+    if(A.tool==='text'){
+      commitText();
+      openTextInput(x, y);
       return;
     }
 
-    emptyHint.style.display = 'none';
-    mainCanvas.style.display = 'block';
-
-    /* render main canvas */
-    renderToCanvas(mainCanvas, ctx);
-
-    /* render mini preview canvases */
-    if (tpl === 'portrait') {
-      renderToCanvas(phoneCanvas, pctx);
-      phoneCanvas.style.display = 'block';
-    } else if (tpl === 'landscape') {
-      renderToCanvas(lsCanvas, lctx);
-      lsCanvas.style.display = 'block';
-    } else {
-      // square — just show main, no device preview
-      phoneCanvas.style.display = 'none';
-      lsCanvas.style.display    = 'none';
-    }
-  }
-
-  /* ── template switching ── */
-  function applyTemplate(tpl) {
-    state.template = tpl;
-
-    /* update button styles */
-    ['tplPortrait','tplLandscape','tplSquare'].forEach(id => $( id).classList.remove('active'));
-    const map = { portrait:'tplPortrait', landscape:'tplLandscape', square:'tplSquare' };
-    $(map[tpl]).classList.add('active');
-
-    /* show/hide device mockups */
-    phoneShell.classList.toggle('visible',    tpl === 'portrait');
-    landscapeShell.classList.toggle('visible', tpl === 'landscape');
-
-    /* adjust default layout for template */
-    if (tpl === 'portrait') {
-      if (layoutMode.value === 'row') layoutMode.value = 'auto';
-    } else if (tpl === 'landscape') {
-      if (layoutMode.value === 'col') layoutMode.value = 'auto';
+    if(A.tool==='select'){
+      // hit-test in reverse order (top-most first)
+      let hit=-1;
+      for(let i=A.objects.length-1;i>=0;i--){
+        if(hitTest(A.objects[i],x,y)){hit=i;break;}
+      }
+      A.selectedIdx=hit;
+      if(hit>=0){
+        A.dragging=true;
+        A.dragObj=A.objects[hit];
+        A.dragOffX=x; A.dragOffY=y;
+      }
+      redrawAnno();
+      return;
     }
 
-    render();
-  }
+    if(A.tool==='erase'){
+      for(let i=A.objects.length-1;i>=0;i--){
+        if(hitTest(A.objects[i],x,y)){
+          pushHistory();
+          A.objects.splice(i,1);
+          redrawAnno();
+          break;
+        }
+      }
+      return;
+    }
 
-  /* ── thumbnails ── */
-  function buildThumbs() {
-    thumbStrip.innerHTML = '';
-    state.images.forEach((img, i) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'thumb';
-      const el = document.createElement('img'); el.src = img.src;
-      wrap.appendChild(el);
-      const num = document.createElement('span'); num.className='thumb-num'; num.textContent=i+1;
-      wrap.appendChild(num);
-      const del = document.createElement('button'); del.className='del'; del.textContent='×'; del.title='移除';
-      del.addEventListener('click', e => { e.stopPropagation(); state.images.splice(i,1); updateAll(); });
-      wrap.appendChild(del);
-      thumbStrip.appendChild(wrap);
-    });
-  }
-
-  function updateBadge() {
-    const got = Math.min(state.images.length, state.needed);
-    countBadge.textContent = `已选 ${got} / ${state.needed}`;
-  }
-
-  function updateAll() { updateBadge(); buildThumbs(); render(); }
-
-  /* ── file loading ── */
-  function loadFiles(files) {
-    const remaining = state.needed - state.images.length;
-    const toLoad = Array.from(files).slice(0, Math.max(0, remaining));
-    if (!toLoad.length) return;
-    let done = 0;
-    toLoad.forEach(f => {
-      const img = new Image();
-      img.onload  = () => { state.images.push(img); done++; if (done===toLoad.length) updateAll(); };
-      img.onerror = () => { done++; if (done===toLoad.length) updateAll(); };
-      img.src = URL.createObjectURL(f);
-    });
-  }
-
-  /* ── events ── */
-  fileInput.addEventListener('change', e => loadFiles(e.target.files));
-  dropzone.addEventListener('click', () => fileInput.click());
-  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
-  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
-  dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('over'); loadFiles(e.dataTransfer.files); });
-
-  colCount.addEventListener('change', () => {
-    state.needed = parseInt(colCount.value);
-    state.images = state.images.slice(0, state.needed);
-    updateAll();
+    // drawing tools
+    A.drawing=true;
+    A.startX=x; A.startY=y;
+    A.pts=[{x,y}];
   });
 
-  $('tplPortrait').addEventListener('click',  () => applyTemplate('portrait'));
-  $('tplLandscape').addEventListener('click', () => applyTemplate('landscape'));
-  $('tplSquare').addEventListener('click',    () => applyTemplate('square'));
+  // ── Pointer move ──────────────────────────────────────────────────────────
+  annoCanvas.addEventListener('pointermove', e=>{
+    const {x,y}=toCanvasPx(e.clientX,e.clientY);
 
-  const redrawInputs = [layoutMode,gapSize,bgColor,fitMode,labelText,fontSize,fontColor,fontFamily,fontWeight,labelPos,labelBg,labelBgOpacity,shadowToggle,
-    $('wmEnable'),$('wmText'),$('wmPos'),$('wmFontSize'),$('wmColor'),$('wmOpacity'),$('wmBg'),$('wmBgOpacity'),$('wmShadow')];
-  redrawInputs.forEach(el => { el.addEventListener('input',render); el.addEventListener('change',render); });
+    if(A.tool==='select'&&A.dragging&&A.dragObj){
+      const dx=x-A.dragOffX, dy=y-A.dragOffY;
+      A.dragOffX=x; A.dragOffY=y;
+      const obj=A.dragObj;
+      if(obj.type==='stroke') obj.pts=obj.pts.map(p=>({x:p.x+dx,y:p.y+dy}));
+      else if(obj.type==='arrow'){obj.x1+=dx;obj.y1+=dy;obj.x2+=dx;obj.y2+=dy;}
+      else if(obj.type==='rect'){obj.x+=dx;obj.y+=dy;}
+      else if(obj.type==='text'){obj.x+=dx;obj.y+=dy;}
+      redrawAnno(); return;
+    }
 
-  $('clearBtn').addEventListener('click', () => { state.images=[]; updateAll(); });
+    if(!A.drawing) return;
 
-  $('downloadBtn').addEventListener('click', () => {
-    if (!state.images.length) return;
-    const a = document.createElement('a');
-    const tplLabel = TEMPLATES[state.template].label.replace(/[: \/]/g,'');
-    a.download = `拼图_${tplLabel}_${Date.now()}.png`;
-    a.href = mainCanvas.toDataURL('image/png');
-    a.click();
+    if(A.tool==='draw'){
+      A.pts.push({x,y});
+      // fast preview: just extend the path on actx
+      redrawAnno();
+      actx.save();
+      actx.strokeStyle=A.color; actx.lineWidth=A.size;
+      actx.lineCap='round'; actx.lineJoin='round';
+      actx.beginPath();
+      actx.moveTo(A.pts[0].x,A.pts[0].y);
+      A.pts.forEach(p=>actx.lineTo(p.x,p.y));
+      actx.stroke(); actx.restore();
+      return;
+    }
+
+    // preview for arrow / rect
+    redrawAnno();
+    actx.save();
+    actx.strokeStyle=A.color; actx.fillStyle=A.color;
+    actx.lineWidth=A.size; actx.lineCap='round'; actx.lineJoin='round';
+    if(A.tool==='arrow'){
+      const x1=A.startX,y1=A.startY,x2=x,y2=y;
+      const dx2=x2-x1,dy2=y2-y1,len=Math.sqrt(dx2*dx2+dy2*dy2);
+      actx.beginPath();actx.moveTo(x1,y1);actx.lineTo(x2,y2);actx.stroke();
+      if(len>4){
+        const hs=Math.min(A.size*4+8,len*0.4);
+        const ang=Math.atan2(dy2,dx2);
+        actx.beginPath();actx.moveTo(x2,y2);
+        actx.lineTo(x2-hs*Math.cos(ang-.4),y2-hs*Math.sin(ang-.4));
+        actx.lineTo(x2-hs*Math.cos(ang+.4),y2-hs*Math.sin(ang+.4));
+        actx.closePath();actx.fill();
+      }
+    } else if(A.tool==='rect'){
+      actx.strokeRect(A.startX,A.startY,x-A.startX,y-A.startY);
+    }
+    actx.restore();
   });
 
-  /* init */
-  updateAll();
+  // ── Pointer up ────────────────────────────────────────────────────────────
+  annoCanvas.addEventListener('pointerup', e=>{
+    const {x,y}=toCanvasPx(e.clientX,e.clientY);
+
+    if(A.tool==='select'&&A.dragging){
+      pushHistory();
+      A.dragging=false; A.dragObj=null;
+      return;
+    }
+    if(!A.drawing) return;
+    A.drawing=false;
+
+    if(A.tool==='draw'&&A.pts.length>=2){
+      pushHistory();
+      A.objects.push({type:'stroke',pts:[...A.pts],color:A.color,size:A.size});
+    } else if(A.tool==='arrow'){
+      const dx=x-A.startX,dy=y-A.startY;
+      if(Math.sqrt(dx*dx+dy*dy)>4){
+        pushHistory();
+        A.objects.push({type:'arrow',x1:A.startX,y1:A.startY,x2:x,y2:y,color:A.color,size:A.size});
+      }
+    } else if(A.tool==='rect'){
+      const w=x-A.startX,h=y-A.startY;
+      if(Math.abs(w)>4&&Math.abs(h)>4){
+        pushHistory();
+        A.objects.push({type:'rect',x:A.startX,y:A.startY,w,h,color:A.color,size:A.size});
+      }
+    }
+    A.pts=[];
+    redrawAnno();
+    $('undoBtn').disabled=A.history.length===0;
+  });
+
+  // touch support
+  annoCanvas.addEventListener('touchstart',e=>{e.preventDefault();annoCanvas.dispatchEvent(new PointerEvent('pointerdown',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY,button:0}));},{passive:false});
+  annoCanvas.addEventListener('touchmove',e=>{e.preventDefault();annoCanvas.dispatchEvent(new PointerEvent('pointermove',{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}));},{passive:false});
+  annoCanvas.addEventListener('touchend',e=>{e.preventDefault();const t=e.changedTouches[0];annoCanvas.dispatchEvent(new PointerEvent('pointerup',{clientX:t.clientX,clientY:t.clientY}));},{passive:false});
+
+  // ── Hook into render() so anno canvas stays in sync ──────────────────────
+  // We patch stageWrap visibility observer via MutationObserver
+  const ro=new ResizeObserver(()=>{
+    if(stageWrap.style.display!=='none') syncSize();
+  });
+  ro.observe(mainCanvas);
+  // Also call after every render
+  const _origShowStage = window.showStage;
+
+  // expose syncSize so render() can call it
+  window.__annoSync = syncSize;
+
+  // ── Bake annotations into export ─────────────────────────────────────────
+  // We expose a function that draws annotations onto an offscreen context
+  // with scale compensation
+  window.__drawAnnotations = function(oc, W, H){
+    // W,H = export canvas size; anno objects are in annoCanvas px coords
+    // annoCanvas.width reflects the current screen canvas px size
+    const aw = annoCanvas.width  || mainCanvas.offsetWidth;
+    const ah = annoCanvas.height || mainCanvas.offsetHeight;
+    const sx = W / aw;
+    const sy = H / ah;
+
+    oc.save();
+    oc.scale(sx, sy);
+
+    A.objects.forEach(obj=>{
+      // scale fontSize and size
+      const scaled = Object.assign({},obj,{
+        size: obj.size || 4,
+        fontSize: obj.fontSize
+      });
+      drawObj(oc, scaled, false);
+    });
+    oc.restore();
+  };
+
+})(); // end annotation engine
+
+// patch render to sync anno canvas size
+const _annoRenderPatch=(function(){
+  const orig=render;
+  render=function(){
+    orig.apply(this,arguments);
+    if(window.__annoSync) window.__annoSync();
+  };
+})();
+
 })();
 </script>
 </body>
